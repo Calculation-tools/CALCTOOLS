@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Top Places Explorer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@700;800&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f7f8fa;
+    --surface: #ffffff;
+    --dark: #111827;
+    --gray: #6b7280;
+    --border: #e5e7eb;
+    --accent: #2563eb;
+    --accent-light: #eff6ff;
+    --green: #059669;
+    --orange: #d97706;
+    --purple: #7c3aed;
+    --red: #dc2626;
+  }
+  body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dark); min-height: 100vh; padding: 28px 16px; }
+  .wrapper { max-width: 860px; margin: 0 auto; }
+
+  .header { text-align: center; margin-bottom: 32px; }
+  .eyebrow { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+  .header h1 { font-family: 'Outfit', sans-serif; font-size: clamp(1.8rem,5vw,2.6rem); font-weight: 800; color: var(--dark); margin-bottom: 8px; letter-spacing: -0.02em; }
+  .header p { color: var(--gray); font-size: 0.9rem; }
+
+  .search-card { background: var(--surface); border-radius: 20px; padding: 24px; border: 1.5px solid var(--border); margin-bottom: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.04); }
+  .search-row { display: flex; gap: 10px; margin-bottom: 14px; }
+  .search-input { flex: 1; background: var(--bg); border: 2px solid var(--border); border-radius: 12px; padding: 13px 16px; font-size: 0.95rem; font-family: 'Inter', sans-serif; color: var(--dark); outline: none; transition: border-color 0.2s; }
+  .search-input:focus { border-color: var(--accent); background: var(--surface); }
+  .search-input::placeholder { color: #9ca3af; }
+  .search-btn { background: var(--accent); color: white; font-weight: 700; font-size: 0.9rem; border: none; border-radius: 12px; padding: 13px 22px; cursor: pointer; transition: all 0.2s; white-space: nowrap; font-family: 'Inter', sans-serif; }
+  .search-btn:hover { background: #1d4ed8; transform: translateY(-1px); }
+  .search-btn:disabled { background: #9ca3af; transform: none; cursor: not-allowed; }
+
+  .filters { display: flex; gap: 8px; flex-wrap: wrap; }
+  .filter-btn { border: 1.5px solid var(--border); border-radius: 20px; padding: 6px 14px; font-size: 0.78rem; font-weight: 600; cursor: pointer; background: none; color: var(--gray); transition: all 0.18s; font-family: 'Inter', sans-serif; }
+  .filter-btn.active { border-color: var(--accent); background: var(--accent-light); color: var(--accent); }
+
+  .count-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; font-size: 0.82rem; color: var(--gray); }
+  .count-input { width: 60px; border: 1.5px solid var(--border); border-radius: 8px; padding: 5px 8px; font-size: 0.88rem; font-family: 'Inter', sans-serif; color: var(--dark); text-align: center; outline: none; }
+  .count-input:focus { border-color: var(--accent); }
+
+  .error-msg { background: #fef2f2; border: 1.5px solid #fca5a5; border-radius: 12px; padding: 14px 16px; font-size: 0.85rem; color: var(--red); margin-bottom: 16px; display: none; }
+  .error-msg.show { display: block; }
+
+  .loading { text-align: center; padding: 48px 20px; color: var(--gray); display: none; }
+  .loading.show { display: block; }
+  .spin { display: inline-block; font-size: 2.4rem; animation: spin 1s linear infinite; margin-bottom: 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .load-text { font-size: 0.9rem; color: var(--gray); }
+
+  .results-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+  .results-title { font-family: 'Outfit', sans-serif; font-size: 1.1rem; font-weight: 700; color: var(--dark); }
+  .results-sub { font-size: 0.78rem; color: var(--gray); }
+
+  .places-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  @media (max-width: 600px) { .places-grid { grid-template-columns: 1fr; } }
+
+  .place-card { background: var(--surface); border-radius: 18px; border: 1.5px solid var(--border); overflow: hidden; transition: all 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  .place-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); border-color: var(--accent); }
+
+  .place-img { width: 100%; height: 160px; object-fit: cover; background: linear-gradient(135deg, #dbeafe, #ede9fe); display: flex; align-items: center; justify-content: center; font-size: 3.5rem; }
+  .place-img.has-image { display: block; }
+
+  .place-body { padding: 16px; }
+  .place-rank { display: inline-flex; align-items: center; gap: 4px; background: var(--accent); color: white; font-size: 0.68rem; font-weight: 800; padding: 2px 8px; border-radius: 20px; margin-bottom: 8px; }
+  .place-name { font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 700; color: var(--dark); margin-bottom: 4px; line-height: 1.3; }
+  .place-cat { display: inline-block; font-size: 0.7rem; font-weight: 600; padding: 2px 9px; border-radius: 20px; margin-bottom: 8px; text-transform: capitalize; }
+  .place-address { font-size: 0.78rem; color: var(--gray); margin-bottom: 10px; display: flex; align-items: flex-start; gap: 5px; line-height: 1.5; }
+  .place-desc { font-size: 0.8rem; color: #4b5563; line-height: 1.6; margin-bottom: 12px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .place-actions { display: flex; gap: 8px; }
+  .place-btn { flex: 1; padding: 8px; border-radius: 9px; font-size: 0.75rem; font-weight: 700; cursor: pointer; text-align: center; text-decoration: none; transition: all 0.18s; border: none; font-family: 'Inter', sans-serif; }
+  .btn-maps { background: #ecfdf5; color: var(--green); border: 1.5px solid #a7f3d0; }
+  .btn-maps:hover { background: #d1fae5; }
+  .btn-wiki { background: var(--accent-light); color: var(--accent); border: 1.5px solid #bfdbfe; }
+  .btn-wiki:hover { background: #dbeafe; }
+  .btn-hotels { background: #fff7ed; color: var(--orange); border: 1.5px solid #fed7aa; }
+  .btn-hotels:hover { background: #ffedd5; }
+
+  .no-results { text-align: center; padding: 48px 20px; color: var(--gray); }
+  .no-results .nr-icon { font-size: 3rem; margin-bottom: 12px; }
+
+  .popular-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .pop-tag { background: var(--accent-light); color: var(--accent); border: 1.5px solid #bfdbfe; border-radius: 20px; padding: 5px 13px; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: all 0.18s; }
+  .pop-tag:hover { background: #dbeafe; }
+
+  .local-warn { background: #fffbeb; border: 1.5px solid #fcd34d; border-radius: 12px; padding: 12px 16px; font-size: 0.82rem; color: #92400e; margin-bottom: 16px; display: none; }
+  .local-warn.show { display: block; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <div class="header">
+    <div class="eyebrow">🗺️ Travel Discovery</div>
+    <h1>Top Places Explorer</h1>
+    <p>Discover top attractions, temples, markets & hidden gems for any city in India</p>
+  </div>
+
+  <div class="local-warn" id="local-warn">
+    ⚠️ <strong>Upload to your website for best results.</strong> Some features may be limited when running as a local file.
+  </div>
+
+  <div class="search-card">
+    <div class="search-row">
+      <input type="text" class="search-input" id="city-input"
+        placeholder="Enter a place e.g. McLeodganj Himachal Pradesh, Dwarka Gujarat, Chandigarh…"
+        onkeydown="if(event.key==='Enter') searchPlaces()">
+      <button class="search-btn" id="search-btn" onclick="searchPlaces()">🔍 Explore</button>
+    </div>
+
+    <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap">
+      <div class="count-row">
+        Show top
+        <input type="number" class="count-input" id="count-input" value="5" min="1" max="20">
+        places
+      </div>
+      <div class="filters" id="filters">
+        <button class="filter-btn active" data-kind="all" onclick="setFilter('all',this)">🌟 All</button>
+        <button class="filter-btn" data-kind="religion" onclick="setFilter('religion',this)">🛕 Temples</button>
+        <button class="filter-btn" data-kind="historic" onclick="setFilter('historic',this)">🏛️ Historic</button>
+        <button class="filter-btn" data-kind="natural" onclick="setFilter('natural',this)">🌿 Nature</button>
+        <button class="filter-btn" data-kind="tourism" onclick="setFilter('tourism',this)">🎡 Tourism</button>
+        <button class="filter-btn" data-kind="leisure" onclick="setFilter('leisure',this)">🏖️ Leisure</button>
+      </div>
+    </div>
+
+    <div style="margin-top:14px">
+      <div style="font-size:0.75rem;color:var(--gray);margin-bottom:8px;font-weight:600">🔥 Popular Searches</div>
+      <div class="popular-tags">
+        <span class="pop-tag" onclick="quickSearch('McLeodganj Himachal Pradesh')">McLeodganj</span>
+        <span class="pop-tag" onclick="quickSearch('Dwarka Gujarat')">Dwarka Gujarat</span>
+        <span class="pop-tag" onclick="quickSearch('Chandigarh Punjab')">Chandigarh</span>
+        <span class="pop-tag" onclick="quickSearch('Rishikesh Uttarakhand')">Rishikesh</span>
+        <span class="pop-tag" onclick="quickSearch('Jaipur Rajasthan')">Jaipur</span>
+        <span class="pop-tag" onclick="quickSearch('Varanasi Uttar Pradesh')">Varanasi</span>
+        <span class="pop-tag" onclick="quickSearch('Shimla Himachal Pradesh')">Shimla</span>
+        <span class="pop-tag" onclick="quickSearch('Agra Uttar Pradesh')">Agra</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="error-msg" id="error-msg"></div>
+  <div class="loading" id="loading">
+    <div class="spin">🗺️</div>
+    <div class="load-text" id="load-text">Searching for top places…</div>
+  </div>
+
+  <div id="results-area" style="display:none">
+    <div class="results-header">
+      <div>
+        <div class="results-title" id="results-title">Top places</div>
+        <div class="results-sub" id="results-sub"></div>
+      </div>
+    </div>
+    <div class="places-grid" id="places-grid"></div>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// AFFILIATE LINKS — REPLACE WITH YOUR AFFILIATE URLs
+// ============================================================
+const AFFILIATES = {
+  makemytrip: 'https://www.makemytrip.com/hotels/',
+  // Replace with: 'https://www.makemytrip.com/hotels/?affid=YOUR_AFFILIATE_ID'
+
+  booking: 'https://www.booking.com/searchresults.html',
+  // Replace with: 'https://www.booking.com/searchresults.html?aid=YOUR_AID'
+
+  goibibo: 'https://www.goibibo.com/hotels/',
+  // Replace with your Goibibo affiliate link
+};
+// ============================================================
+
+let activeFilter = 'all';
+let lastResults = [];
+let lastCity = '';
+let lastCoords = null;
+
+if (window.location.protocol === 'file:') {
+  document.getElementById('local-warn').classList.add('show');
+}
+
+function setFilter(kind, btn) {
+  activeFilter = kind;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (lastResults.length) renderPlaces(filterResults(lastResults));
+}
+
+function filterResults(places) {
+  if (activeFilter === 'all') return places;
+  return places.filter(p => {
+    const tags = p.tags || {};
+    const amenity = (tags.amenity || '').toLowerCase();
+    const historic = (tags.historic || '').toLowerCase();
+    const tourism = (tags.tourism || '').toLowerCase();
+    const leisure = (tags.leisure || '').toLowerCase();
+    const natural = (tags.natural || '').toLowerCase();
+    const name = (tags.name || '').toLowerCase();
+    if (activeFilter === 'religion') return amenity.includes('place_of_worship') || name.includes('temple') || name.includes('mandir') || name.includes('masjid') || name.includes('church') || name.includes('gurudwara') || name.includes('dargah');
+    if (activeFilter === 'historic') return !!historic || name.includes('fort') || name.includes('palace') || name.includes('mahal') || name.includes('memorial');
+    if (activeFilter === 'natural') return !!natural || name.includes('waterfall') || name.includes('lake') || name.includes('beach');
+    if (activeFilter === 'tourism') return !!tourism;
+    if (activeFilter === 'leisure') return !!leisure || name.includes('park') || name.includes('garden');
+    return true;
+  });
+}
+
+function quickSearch(query) {
+  document.getElementById('city-input').value = query;
+  searchPlaces();
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg;
+  el.classList.toggle('show', !!msg);
+}
+
+function showLoading(v, text) {
+  document.getElementById('loading').classList.toggle('show', v);
+  if (text) document.getElementById('load-text').textContent = text;
+  if (v) {
+    document.getElementById('results-area').style.display = 'none';
+    showError('');
+  }
+}
+
+async function geocodeCity(query) {
+  const words = query.trim().split(' ').filter(Boolean);
+  const stateHint = words.length > 1 ? words[words.length-1].toLowerCase() : '';
+  const cityName = words[0];
+
+  function parseNominatim(results) {
+    if (!results || !results.length) return null;
+    const r = results[0];
+    return {
+      latitude: parseFloat(r.lat),
+      longitude: parseFloat(r.lon),
+      name: r.display_name.split(',')[0].trim(),
+      admin1: (r.display_name.split(',')[1] || '').trim(),
+      country: 'India'
+    };
+  }
+
+  function parseOpenMeteo(results) {
+    if (!results || !results.length) return null;
+    const india = results.filter(x => x.country_code === 'IN');
+    const r = india[0] || results[0];
+    return r;
+  }
+
+  // Try multiple search terms
+  const searchTerms = [
+    cityName,                          // "Ujjain"
+    query.trim(),                      // "Ujjain MP" or "Ujjain Madhya Pradesh"
+    cityName + ', India',              // "Ujjain, India"
+    cityName + ' India',               // "Ujjain India"
+  ];
+
+  // Try Nominatim first for each term — most comprehensive India database
+  for (const term of searchTerms) {
+    try {
+      const url = 'https://nominatim.openstreetmap.org/search?' +
+        'q=' + encodeURIComponent(term) +
+        '&format=json&limit=5&addressdetails=0&accept-language=en&countrycodes=in';
+      const resp = await fetch(url, { mode: 'cors', headers: { 'Accept': 'application/json' } });
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      if (data && data.length > 0) {
+        console.log('Nominatim found:', term, data[0].display_name);
+        return parseNominatim(data);
+      }
+    } catch(e) { console.log('Nominatim error:', e.message); }
+  }
+
+  // Fallback: Open-Meteo
+  for (const term of [cityName, query.trim()]) {
+    try {
+      const url = 'https://geocoding-api.open-meteo.com/v1/search?name=' +
+        encodeURIComponent(term) + '&count=10&language=en&format=json';
+      const resp = await fetch(url, { mode: 'cors' });
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      const result = parseOpenMeteo(data.results);
+      if (result) {
+        console.log('OpenMeteo found:', term, result.name);
+        return result;
+      }
+    } catch(e) { console.log('OpenMeteo error:', e.message); }
+  }
+
+  // Last resort: Photon (Komoot) geocoder
+  try {
+    const url = 'https://photon.komoot.io/api/?q=' +
+      encodeURIComponent(cityName + ' India') + '&limit=5&lang=en';
+    const resp = await fetch(url, { mode: 'cors' });
+    if (resp.ok) {
+      const data = await resp.json();
+      const features = (data.features || []).filter(f =>
+        (f.properties.country || '').toLowerCase().includes('india') ||
+        (f.properties.countrycode || '').toLowerCase() === 'in'
+      );
+      if (features.length > 0) {
+        const f = features[0];
+        console.log('Photon found:', f.properties.name);
+        return {
+          latitude: f.geometry.coordinates[1],
+          longitude: f.geometry.coordinates[0],
+          name: f.properties.name || cityName,
+          admin1: f.properties.state || '',
+          country: 'India'
+        };
+      }
+    }
+  } catch(e) { console.log('Photon error:', e.message); }
+
+  throw new Error(
+    'Could not locate "' + query + '". ' +
+    'Please open browser console (F12) and check for errors. ' +
+    'If you see CORS errors, the tool must be accessed from a website, not a local file.'
+  );
+}
+
+  // Famous Indian attractions — guaranteed to show when city/state matches
+  const FAMOUS_PLACES = [
+    {name:'Statue of Unity',city:'kevadia',state:'gujarat',lat:21.8384,lon:73.7190,cat:'tourism',desc:'World tallest statue at 182 metres, dedicated to Sardar Vallabhbhai Patel. Located near Vadodara.',wiki:'Statue_of_Unity'},
+    {name:'Rann of Kutch',city:'kutch',state:'gujarat',lat:23.7337,lon:69.8597,cat:'natural',desc:'World largest salt flat. Famous for Rann Utsav festival and spectacular full moon nights.',wiki:'Rann_of_Kutch'},
+    {name:'Gir National Park',city:'gir',state:'gujarat',lat:21.1237,lon:70.7880,cat:'natural',desc:'Only natural habitat of Asiatic Lions in the world. Over 600 lions live here.',wiki:'Gir_National_Park'},
+    {name:'Dwarkadhish Temple',city:'dwarka',state:'gujarat',lat:22.2394,lon:68.9680,cat:'religion',desc:'One of the four sacred Char Dham pilgrimage sites. Ancient temple dedicated to Lord Krishna.',wiki:'Dwarkadhish_Temple'},
+    {name:'Somnath Temple',city:'somnath',state:'gujarat',lat:20.8880,lon:70.4013,cat:'religion',desc:'One of the twelve Jyotirlingas. Ancient temple on the Arabian Sea coast rebuilt many times.',wiki:'Somnath_temple'},
+    {name:'Sun Temple Modhera',city:'modhera',state:'gujarat',lat:23.5827,lon:72.1349,cat:'historic',desc:'11th century Solanki-era sun temple with intricate stone carvings. UNESCO tentative site.',wiki:'Sun_Temple,_Modhera'},
+    {name:'Adalaj Stepwell',city:'adalaj',state:'gujarat',lat:23.1647,lon:72.5796,cat:'historic',desc:'Magnificent 15th century Indo-Islamic stepwell. Five storeys deep with intricate carvings.',wiki:'Adalaj'},
+    {name:'Taj Mahal',city:'agra',state:'uttar pradesh',lat:27.1751,lon:78.0421,cat:'historic',desc:'One of the Seven Wonders of the World. Iconic white marble mausoleum by Mughal emperor Shah Jahan.',wiki:'Taj_Mahal'},
+    {name:'Golden Temple',city:'amritsar',state:'punjab',lat:31.6200,lon:74.8765,cat:'religion',desc:'Harmandir Sahib — holiest shrine in Sikhism. Gold-plated temple reflected in the Amrit Sarovar.',wiki:'Golden_Temple'},
+    {name:'Qutub Minar',city:'delhi',state:'delhi',lat:28.5245,lon:77.1855,cat:'historic',desc:'UNESCO World Heritage Site. Tallest brick minaret in the world at 72.5 metres, built in 1193.',wiki:'Qutb_Minar'},
+    {name:'Red Fort',city:'delhi',state:'delhi',lat:28.6562,lon:77.2410,cat:'historic',desc:'Iconic Mughal fort in Old Delhi. UNESCO World Heritage Site and symbol of India independence.',wiki:'Red_Fort'},
+    {name:'Gateway of India',city:'mumbai',state:'maharashtra',lat:18.9220,lon:72.8347,cat:'historic',desc:'Iconic arch monument built in 1924. Mumbai most recognised landmark.',wiki:'Gateway_of_India'},
+    {name:'Ellora Caves',city:'aurangabad',state:'maharashtra',lat:20.0258,lon:75.1780,cat:'historic',desc:'UNESCO World Heritage Site. Rock-cut temples from 600-1000 CE across Hindu, Buddhist and Jain traditions.',wiki:'Ellora_Caves'},
+    {name:'Ajanta Caves',city:'aurangabad',state:'maharashtra',lat:20.5519,lon:75.7033,cat:'historic',desc:'UNESCO World Heritage Site. Rock-cut Buddhist caves with exquisite murals from 2nd century BCE.',wiki:'Ajanta_Caves'},
+    {name:'Hawa Mahal',city:'jaipur',state:'rajasthan',lat:26.9239,lon:75.8267,cat:'historic',desc:'Palace of Winds — five-storey pink sandstone palace with 953 windows. Iconic symbol of Jaipur.',wiki:'Hawa_Mahal'},
+    {name:'Amber Fort',city:'jaipur',state:'rajasthan',lat:26.9855,lon:75.8513,cat:'historic',desc:'Magnificent Rajput fort palace. UNESCO World Heritage Site.',wiki:'Amer_Fort'},
+    {name:'Charminar',city:'hyderabad',state:'telangana',lat:17.3616,lon:78.4747,cat:'historic',desc:'Iconic monument and mosque built in 1591. Symbol of Hyderabad.',wiki:'Charminar'},
+    {name:'Mysore Palace',city:'mysore',state:'karnataka',lat:12.3052,lon:76.6552,cat:'historic',desc:'Magnificent palace of the Wadiyar dynasty. One of India most visited monuments.',wiki:'Mysore_Palace'},
+    {name:'Hampi Ruins',city:'hampi',state:'karnataka',lat:15.3350,lon:76.4600,cat:'historic',desc:'UNESCO World Heritage Site. Ruins of the Vijayanagara Empire capital from the 14th century.',wiki:'Hampi'},
+    {name:'Meenakshi Amman Temple',city:'madurai',state:'tamil nadu',lat:9.9195,lon:78.1193,cat:'religion',desc:'Ancient Hindu temple with towering gopurams. One of India greatest temples.',wiki:'Meenakshi_Amman_Temple'},
+    {name:'Backwaters Alleppey',city:'alleppey',state:'kerala',lat:9.4981,lon:76.3388,cat:'natural',desc:'Famous Kerala backwaters known for houseboat cruises through lagoons and canals.',wiki:'Alleppey'},
+    {name:'Kaziranga National Park',city:'kaziranga',state:'assam',lat:26.5775,lon:93.1711,cat:'natural',desc:'UNESCO World Heritage Site. Home to two-thirds of world one-horned rhinoceroses.',wiki:'Kaziranga_National_Park'},
+    {name:'Konark Sun Temple',city:'konark',state:'odisha',lat:19.8876,lon:86.0945,cat:'historic',desc:'UNESCO World Heritage Site. 13th century temple designed as a giant chariot of the Sun god.',wiki:'Konark_Sun_Temple'},
+    {name:'Dal Lake',city:'srinagar',state:'jammu kashmir',lat:34.0837,lon:74.8220,cat:'natural',desc:'Famous lake in Srinagar known for houseboats and shikaras. Surrounded by Himalayan mountains.',wiki:'Dal_Lake'},
+    {name:'Varanasi Ghats',city:'varanasi',state:'uttar pradesh',lat:25.3109,lon:83.0104,cat:'religion',desc:'Sacred ghats along the Ganga. Dashashwamedh Ghat hosts the spectacular daily Ganga Aarti.',wiki:'Ghats_in_Varanasi'},
+    {name:'Tirupati Balaji Temple',city:'tirupati',state:'andhra pradesh',lat:13.6833,lon:79.3469,cat:'religion',desc:'Sri Venkateswara Temple — richest and most visited temple in the world with 100,000 daily visitors.',wiki:'Tirumala_Venkateswara_Temple'},
+    {name:'Lotus Temple',city:'delhi',state:'delhi',lat:28.5535,lon:77.2588,cat:'religion',desc:'Lotus-shaped Bahai House of Worship. Welcomes people of all religions for prayer and meditation.',wiki:'Lotus_Temple'},
+
+    // Madhya Pradesh
+    {name:'Khajuraho Temples',city:'khajuraho',state:'madhya pradesh',lat:24.8318,lon:79.9199,cat:'historic',desc:'UNESCO World Heritage Site. Group of Hindu and Jain temples famous for their nagara-style architecture and erotic sculptures.',wiki:'Khajuraho_Group_of_Monuments'},
+    {name:'Sanchi Stupa',city:'sanchi',state:'madhya pradesh',lat:23.4798,lon:77.7399,cat:'historic',desc:'UNESCO World Heritage Site. Oldest stone structure in India. Buddhist stupa commissioned by Emperor Ashoka in 3rd century BCE.',wiki:'Sanchi'},
+    {name:'Bandhavgarh National Park',city:'bandhavgarh',state:'madhya pradesh',lat:23.7167,lon:81.0167,cat:'natural',desc:'One of India best tiger reserves with highest density of Bengal tigers. Also home to leopards and sloth bears.',wiki:'Bandhavgarh_National_Park'},
+    {name:'Kanha National Park',city:'kanha',state:'madhya pradesh',lat:22.3328,lon:80.6115,cat:'natural',desc:'Inspiration for Rudyard Kipling Jungle Book. Famous tiger reserve and home to rare barasingha deer.',wiki:'Kanha_Tiger_Reserve'},
+    {name:'Ujjain Mahakaleshwar',city:'ujjain',state:'madhya pradesh',lat:23.1828,lon:75.7682,cat:'religion',desc:'One of the twelve Jyotirlingas. Ancient Mahakaleshwar temple on the banks of Shipra river in Ujjain.',wiki:'Mahakaleshwar_Jyotirlinga'},
+    {name:'Orchha Fort',city:'orchha',state:'madhya pradesh',lat:25.3518,lon:78.6417,cat:'historic',desc:'16th century Bundela fort and palace complex. Ram Raja Temple here is the only temple where Lord Ram is worshipped as a king.',wiki:'Orchha'},
+    {name:'Mandu Ruins',city:'mandu',state:'madhya pradesh',lat:22.3565,lon:75.3918,cat:'historic',desc:'Ancient ruined city with Afghan architecture. Famous for the love story of Baz Bahadur and Rani Roopmati.',wiki:'Mandu,_Madhya_Pradesh'},
+    {name:'Pachmarhi Hill Station',city:'pachmarhi',state:'madhya pradesh',lat:22.4675,lon:78.4338,cat:'natural',desc:'Only hill station in Madhya Pradesh. Known as Queen of Satpura. UNESCO Biosphere Reserve with caves and waterfalls.',wiki:'Pachmarhi'},
+
+    // Rajasthan (additional)
+    {name:'Jaisalmer Fort',city:'jaisalmer',state:'rajasthan',lat:26.9124,lon:70.9113,cat:'historic',desc:'UNESCO World Heritage Site. Golden sandstone fort rising from the Thar Desert. One of the few living forts in the world.',wiki:'Jaisalmer_Fort'},
+    {name:'City Palace Udaipur',city:'udaipur',state:'rajasthan',lat:24.5764,lon:73.6831,cat:'historic',desc:'Magnificent palace complex on the banks of Lake Pichola. The largest palace complex in Rajasthan.',wiki:'City_Palace,_Udaipur'},
+    {name:'Mehrangarh Fort',city:'jodhpur',state:'rajasthan',lat:26.2980,lon:73.0188,cat:'historic',desc:'One of India largest forts. Perched 122 metres above Jodhpur with panoramic views of the Blue City.',wiki:'Mehrangarh'},
+    {name:'Ranthambore National Park',city:'ranthambore',state:'rajasthan',lat:26.0173,lon:76.5026,cat:'natural',desc:'Famous tiger reserve with a historic fort. Best place in India to spot Bengal tigers in the wild.',wiki:'Ranthambore_National_Park'},
+    {name:'Pushkar Lake',city:'pushkar',state:'rajasthan',lat:26.4892,lon:74.5517,cat:'religion',desc:'Sacred lake with 52 ghats. Home to the only Brahma temple in the world. Famous for annual Pushkar Camel Fair.',wiki:'Pushkar'},
+    {name:'Ajmer Sharif Dargah',city:'ajmer',state:'rajasthan',lat:26.4524,lon:74.6234,cat:'religion',desc:'One of the most important Muslim pilgrimage sites in India. Tomb of Sufi saint Moinuddin Chishti.',wiki:'Dargah_Sharif,_Ajmer'},
+    {name:'Bikaner Junagarh Fort',city:'bikaner',state:'rajasthan',lat:28.0181,lon:73.3169,cat:'historic',desc:'Magnificent fort built in 1588. Never conquered despite numerous attacks. Houses an excellent museum.',wiki:'Junagarh_Fort'},
+
+    // Uttar Pradesh (additional)
+    {name:'Agra Fort',city:'agra',state:'uttar pradesh',lat:27.1795,lon:78.0211,cat:'historic',desc:'UNESCO World Heritage Site. Massive Mughal fort on the Yamuna river. Served as the main residence of Mughal emperors.',wiki:'Agra_Fort'},
+    {name:'Fatehpur Sikri',city:'fatehpur sikri',state:'uttar pradesh',lat:27.0940,lon:77.6670,cat:'historic',desc:'UNESCO World Heritage Site. Abandoned Mughal capital built by Emperor Akbar in 1571. Perfectly preserved ghost city.',wiki:'Fatehpur_Sikri'},
+    {name:'Vrindavan temples',city:'vrindavan',state:'uttar pradesh',lat:27.5794,lon:77.6965,cat:'religion',desc:'Sacred city with 5,000 temples associated with Lord Krishna childhood. Banke Bihari and ISKCON temples are most visited.',wiki:'Vrindavan'},
+    {name:'Mathura Krishna Janmabhoomi',city:'mathura',state:'uttar pradesh',lat:27.5000,lon:77.6700,cat:'religion',desc:'Birthplace of Lord Krishna. One of the seven sacred cities in Hinduism. Famous for Holi celebrations.',wiki:'Mathura'},
+    {name:'Sarnath',city:'sarnath',state:'uttar pradesh',lat:25.3814,lon:83.0238,cat:'historic',desc:'Where Buddha delivered his first sermon after enlightenment. Major Buddhist pilgrimage site with ancient stupas and ruins.',wiki:'Sarnath'},
+    {name:'Dudhwa National Park',city:'dudhwa',state:'uttar pradesh',lat:28.4833,lon:80.5333,cat:'natural',desc:'National park on the Indo-Nepal border. Home to tigers, rhinos, swamp deer and over 400 bird species.',wiki:'Dudhwa_National_Park'},
+    {name:'Ram Mandir Ayodhya',city:'ayodhya',state:'uttar pradesh',lat:26.7951,lon:82.1943,cat:'religion',desc:'The newly built grand Ram temple at the birthplace of Lord Ram. One of the most significant Hindu temples in India, consecrated in January 2024.',wiki:'Ram_Mandir,_Ayodhya'},
+    {name:'Hanuman Garhi Ayodhya',city:'ayodhya',state:'uttar pradesh',lat:26.7956,lon:82.1983,cat:'religion',desc:'Ancient Hanuman temple in Ayodhya. One of the most visited temples in the holy city, believed to be the residence of Hanuman who guards Ram Janmabhoomi.',wiki:'Hanuman_Garhi'},
+    {name:'Kashi Vishwanath Temple',city:'varanasi',state:'uttar pradesh',lat:25.3109,lon:83.0107,cat:'religion',desc:'One of the twelve Jyotirlingas and the most sacred Shiva temple in India. The newly built Kashi Vishwanath Corridor has transformed this ancient temple complex.',wiki:'Kashi_Vishwanath_Temple'},
+    {name:'Manas Sarovar Ayodhya',city:'ayodhya',state:'uttar pradesh',lat:26.7919,lon:82.1942,cat:'religion',desc:'Sacred lake near Ram Mandir in Ayodhya. Part of the grand Ram temple complex and pilgrimage circuit.',wiki:'Ayodhya'},
+    {name:'Prayagraj Triveni Sangam',city:'prayagraj',state:'uttar pradesh',lat:25.4231,lon:81.8842,cat:'religion',desc:'Sacred confluence of rivers Ganga, Yamuna and the mythical Saraswati. One of the holiest spots in Hinduism. Hosts the Kumbh Mela every 12 years.',wiki:'Triveni_Sangam,_Prayagraj'},
+    {name:'Iskcon Vrindavan',city:'vrindavan',state:'uttar pradesh',lat:27.5749,lon:77.6965,cat:'religion',desc:'Magnificent ISKCON temple in Vrindavan. One of the most visited Krishna temples in the world with stunning architecture.',wiki:'ISKCON_Vrindavan'},
+    {name:'Naimisharanya',city:'sitapur',state:'uttar pradesh',lat:27.3618,lon:80.4765,cat:'religion',desc:'One of the most sacred pilgrimage sites in Hinduism. Mentioned in Puranas as the spiritual heart of the universe. Important Shakti Peeth.',wiki:'Naimisharanya'},
+
+    // Tamil Nadu (additional)
+    {name:'Mahabalipuram',city:'mahabalipuram',state:'tamil nadu',lat:12.6269,lon:80.1927,cat:'historic',desc:'UNESCO World Heritage Site. Shore Temple and rock-cut cave temples built by Pallava dynasty in 7th century.',wiki:'Mahabalipuram'},
+    {name:'Brihadeeswarar Temple',city:'thanjavur',state:'tamil nadu',lat:10.7828,lon:79.1318,cat:'religion',desc:'UNESCO World Heritage Site. 11th century Chola masterpiece. Temple tower is 66 metres tall with a 80-tonne granite capstone.',wiki:'Brihadisvara_Temple,_Thanjavur'},
+    {name:'Rameshwaram Temple',city:'rameshwaram',state:'tamil nadu',lat:9.2885,lon:79.3129,cat:'religion',desc:'One of the twelve Jyotirlingas and one of the Char Dham pilgrimage sites. Famous for its long corridors and 22 sacred wells.',wiki:'Ramanathaswamy_Temple'},
+    {name:'Ooty Botanical Garden',city:'ooty',state:'tamil nadu',lat:11.4139,lon:76.6940,cat:'leisure',desc:'22-hectare Government Botanical Garden established in 1848. Home to 650 plant species including a 20 million year old fossil tree.',wiki:'Government_Botanical_Garden,_Ooty'},
+    {name:'Kodaikanal Lake',city:'kodaikanal',state:'tamil nadu',lat:10.2381,lon:77.4892,cat:'natural',desc:'Star-shaped lake at 2,133 metres altitude. Famous hill station known as the Princess of Hill Stations.',wiki:'Kodaikanal'},
+    {name:'Kanyakumari',city:'kanyakumari',state:'tamil nadu',lat:8.0883,lon:77.5385,cat:'tourism',desc:'Southernmost tip of India where three oceans meet. Famous for sunrise and sunset views. Vivekananda Rock Memorial.',wiki:'Kanyakumari'},
+
+    // Kerala (additional)
+    {name:'Munnar Tea Gardens',city:'munnar',state:'kerala',lat:10.0889,lon:77.0595,cat:'natural',desc:'Scenic hill station at 1,600 metres surrounded by rolling tea plantations. One of South India most popular destinations.',wiki:'Munnar'},
+    {name:'Periyar Wildlife Sanctuary',city:'thekkady',state:'kerala',lat:9.5085,lon:77.1697,cat:'natural',desc:'Famous wildlife reserve around Periyar Lake. Boat safaris offer views of elephants, tigers and leopards.',wiki:'Periyar_Tiger_Reserve'},
+    {name:'Padmanabhaswamy Temple',city:'thiruvananthapuram',state:'kerala',lat:8.4824,lon:76.9493,cat:'religion',desc:'One of the wealthiest temples in the world. Vishnu temple with treasures worth over 1 lakh crore rupees.',wiki:'Padmanabhaswamy_Temple'},
+    {name:'Wayanad Wildlife Sanctuary',city:'wayanad',state:'kerala',lat:11.6854,lon:76.1320,cat:'natural',desc:'Dense forests home to elephants, tigers, leopards, gaur and over 200 bird species in the Western Ghats.',wiki:'Wayanad_Wildlife_Sanctuary'},
+    {name:'Varkala Beach',city:'varkala',state:'kerala',lat:8.7379,lon:76.7163,cat:'natural',desc:'Cliff-top beach with natural spring mineral water. Janardhana Swami Temple sits dramatically at the cliff edge.',wiki:'Varkala'},
+    {name:'Athirapally Waterfalls',city:'thrissur',state:'kerala',lat:10.2841,lon:76.5692,cat:'natural',desc:'The Niagara of India. Spectacular 80-feet waterfall on the Chalakudy river. Featured in many Indian films.',wiki:'Athirappilly_Falls'},
+
+    // Karnataka (additional)
+    {name:'Coorg Madikeri',city:'coorg',state:'karnataka',lat:12.4244,lon:75.7382,cat:'natural',desc:'Scotland of India. Famous for coffee and spice plantations, misty hills, waterfalls and elephant camps.',wiki:'Kodagu_district'},
+    {name:'Badami Cave Temples',city:'badami',state:'karnataka',lat:15.9182,lon:75.6806,cat:'historic',desc:'6th century Chalukya rock-cut cave temples. Four caves with beautiful sculptures of Vishnu, Shiva and Jain figures.',wiki:'Badami_cave_temples'},
+    {name:'Jog Falls',city:'jog falls',state:'karnataka',lat:14.2270,lon:74.8097,cat:'natural',desc:'Second highest waterfall in India at 253 metres. Four distinct falls — Raja, Rani, Rover and Rocket.',wiki:'Jog_Falls'},
+    {name:'Belur Halebidu Temples',city:'belur',state:'karnataka',lat:13.1651,lon:75.8649,cat:'historic',desc:'12th century Hoysala temples with intricate star-shaped base and detailed sculpture. UNESCO tentative site.',wiki:'Belur'},
+    {name:'Chikmagalur Coffee Hills',city:'chikmagalur',state:'karnataka',lat:13.3153,lon:75.7754,cat:'natural',desc:'Birthplace of Indian coffee. Misty hills with coffee and spice plantations. Famous for Mullayanagiri peak.',wiki:'Chikkamagaluru'},
+    {name:'Nagarhole National Park',city:'nagarhole',state:'karnataka',lat:12.0517,lon:76.1240,cat:'natural',desc:'Rajiv Gandhi National Park. Dense forests with tigers, elephants, leopards, gaur and deer.',wiki:'Nagarhole_National_Park'},
+
+    // Maharashtra (additional)
+    {name:'Shirdi Sai Baba Temple',city:'shirdi',state:'maharashtra',lat:19.7674,lon:74.4777,cat:'religion',desc:'One of the most visited pilgrimage sites in India. Temple dedicated to Saint Sai Baba attracting over 25,000 visitors daily.',wiki:'Shirdi'},
+    {name:'Lonavala Hill Station',city:'lonavala',state:'maharashtra',lat:18.7481,lon:73.4072,cat:'natural',desc:'Popular hill station between Mumbai and Pune. Famous for chikki, waterfalls and the scenic Bushi Dam.',wiki:'Lonavala'},
+    {name:'Mahabaleshwar',city:'mahabaleshwar',state:'maharashtra',lat:17.9236,lon:73.6572,cat:'natural',desc:'Popular hill station at 1,438 metres. Famous for strawberries, seven lakes and beautiful viewpoints.',wiki:'Mahabaleshwar'},
+    {name:'Nashik Trimbakeshwar',city:'nashik',state:'maharashtra',lat:19.9322,lon:73.5300,cat:'religion',desc:'One of the twelve Jyotirlingas. Source of the Godavari river. Nashik is one of the four Kumbh Mela sites.',wiki:'Trimbakeshwar_Shiva_Temple'},
+    {name:'Daulatabad Fort',city:'aurangabad',state:'maharashtra',lat:19.9406,lon:75.2159,cat:'historic',desc:'One of the most powerful fortifications in India. 14th century fort on a 200-metre conical hill.',wiki:'Daulatabad_Fort'},
+    {name:'Kolhapur Mahalakshmi Temple',city:'kolhapur',state:'maharashtra',lat:16.7050,lon:74.2333,cat:'religion',desc:'One of the Shakti Peethas. Ancient temple of Goddess Mahalakshmi. Famous for direct sunbeam falling on the idol.',wiki:'Mahalakshmi_Temple,_Kolhapur'},
+
+    // Himachal Pradesh
+    {name:'Rohtang Pass',city:'manali',state:'himachal pradesh',lat:32.3717,lon:77.2526,cat:'natural',desc:'High mountain pass at 3,978 metres connecting Kullu Valley to Lahaul and Spiti. Open May to October.',wiki:'Rohtang_Pass'},
+    {name:'Kullu Dussehra',city:'kullu',state:'himachal pradesh',lat:31.9578,lon:77.1095,cat:'tourism',desc:'Kullu Valley — Valley of Gods. Famous for international Dussehra festival, river rafting and apple orchards.',wiki:'Kullu'},
+    {name:'Spiti Valley',city:'spiti',state:'himachal pradesh',lat:32.2461,lon:78.0337,cat:'natural',desc:'Cold desert mountain valley at 3,800 metres. Known as Little Tibet. Key Monastery and Chandratal Lake are highlights.',wiki:'Spiti_Valley'},
+    {name:'Kasol Parvati Valley',city:'kasol',state:'himachal pradesh',lat:32.0093,lon:77.3148,cat:'natural',desc:'Mini Israel of India. Scenic village on the Parvati river. Base for trekking to Kheerganga and Pin Parvati Pass.',wiki:'Kasol'},
+    {name:'Triund Trek',city:'mcleodganj',state:'himachal pradesh',lat:32.2600,lon:76.3400,cat:'natural',desc:'Popular one-day trek from McLeodganj to Triund ridge at 2,875 metres. Stunning views of Dhauladhar range.',wiki:'Triund'},
+    {name:'Dharamshala Cricket Stadium',city:'dharamshala',state:'himachal pradesh',lat:32.2214,lon:76.3178,cat:'tourism',desc:'One of the most scenic cricket stadiums in the world. Sits at 1,457 metres with backdrop of snow-capped Himalayas.',wiki:'HPCA_Stadium'},
+    {name:'Baijnath Temple',city:'baijnath',state:'himachal pradesh',lat:32.0524,lon:76.6500,cat:'religion',desc:'Ancient Shiva temple built in 1204 CE. One of the finest examples of early medieval North Indian temple architecture.',wiki:'Baijnath_temple,_Himachal_Pradesh'},
+
+    // Uttarakhand
+    {name:'Valley of Flowers',city:'chamoli',state:'uttarakhand',lat:30.7282,lon:79.6050,cat:'natural',desc:'UNESCO World Heritage Site. Alpine meadow at 3,658 metres with hundreds of wild flower species. Open July to September.',wiki:'Valley_of_Flowers_National_Park'},
+    {name:'Kedarnath Temple',city:'kedarnath',state:'uttarakhand',lat:30.7346,lon:79.0669,cat:'religion',desc:'One of the twelve Jyotirlingas at 3,583 metres. One of the four Char Dham pilgrimage sites. Surrounded by snow peaks.',wiki:'Kedarnath_Temple'},
+    {name:'Badrinath Temple',city:'badrinath',state:'uttarakhand',lat:30.7433,lon:79.4938,cat:'religion',desc:'One of the four Char Dham pilgrimage sites. Vishnu temple at 3,133 metres on the banks of Alaknanda river.',wiki:'Badrinath_Temple'},
+    {name:'Jim Corbett National Park',city:'corbett',state:'uttarakhand',lat:29.5300,lon:78.7747,cat:'natural',desc:'India oldest national park established in 1936. Named after Jim Corbett. Famous for Bengal tigers and elephants.',wiki:'Jim_Corbett_National_Park'},
+    {name:'Auli Ski Resort',city:'auli',state:'uttarakhand',lat:30.5191,lon:79.5665,cat:'tourism',desc:'India premier ski resort at 2,519 to 3,049 metres. Offers views of Nanda Devi and other Himalayan peaks.',wiki:'Auli'},
+    {name:'Lansdowne Hill Station',city:'lansdowne',state:'uttarakhand',lat:29.8428,lon:78.6854,cat:'natural',desc:'Quiet offbeat hill station at 1,700 metres. Known as the cleanest hill station in Uttarakhand. Minimal commercialisation.',wiki:'Lansdowne'},
+
+    // West Bengal
+    {name:'Victoria Memorial',city:'kolkata',state:'west bengal',lat:22.5448,lon:88.3426,cat:'historic',desc:'Magnificent white marble monument built between 1906 and 1921. Dedicated to Queen Victoria. Now a museum.',wiki:'Victoria_Memorial,_Kolkata'},
+    {name:'Howrah Bridge',city:'kolkata',state:'west bengal',lat:22.5851,lon:88.3468,cat:'historic',desc:'Iconic cantilever bridge over Hooghly river. One of the busiest bridges in the world. Symbol of Kolkata.',wiki:'Howrah_Bridge'},
+    {name:'Sundarbans National Park',city:'sundarbans',state:'west bengal',lat:21.9497,lon:89.1833,cat:'natural',desc:'UNESCO World Heritage Site. Largest mangrove forest in the world. Home to Royal Bengal Tigers and Irrawaddy dolphins.',wiki:'Sundarbans_National_Park'},
+
+    // Punjab & Haryana
+    {name:'Wagah Border Ceremony',city:'amritsar',state:'punjab',lat:31.6049,lon:74.5727,cat:'tourism',desc:'Spectacular daily flag-lowering ceremony at India-Pakistan border. One of the most patriotic spectacles in India.',wiki:'Wagah'},
+    {name:'Pinjore Gardens',city:'chandigarh',state:'haryana',lat:30.7967,lon:76.9176,cat:'leisure',desc:'Mughal-style terraced garden also known as Yadavindra Gardens. 100-acre garden with fountains and historic buildings.',wiki:'Pinjore_gardens'},
+    {name:'Sukhna Lake',city:'chandigarh',state:'chandigarh',lat:30.7426,lon:76.8185,cat:'natural',desc:'Artificial reservoir at the foothills of the Shivalik Hills. Popular for boating and morning walks.',wiki:'Sukhna_Lake'},
+    {name:'Rock Garden Chandigarh',city:'chandigarh',state:'chandigarh',lat:30.7528,lon:76.8163,cat:'tourism',desc:'Unique sculpture garden made entirely from industrial and urban waste by artist Nek Chand. Over 5,000 sculptures.',wiki:'Rock_Garden_of_Chandigarh'},
+
+    // Bihar & Jharkhand
+    {name:'Bodh Gaya Mahabodhi Temple',city:'bodh gaya',state:'bihar',lat:24.6959,lon:84.9916,cat:'religion',desc:'UNESCO World Heritage Site. Where Gautama Buddha attained enlightenment under the Bodhi tree. Most sacred Buddhist site.',wiki:'Mahabodhi_Temple'},
+    {name:'Nalanda University Ruins',city:'nalanda',state:'bihar',lat:25.1358,lon:85.4438,cat:'historic',desc:'UNESCO World Heritage Site. Ancient centre of learning from 5th to 12th century. Once world greatest university.',wiki:'Nalanda'},
+    {name:'Rajgir Hills',city:'rajgir',state:'bihar',lat:25.0292,lon:85.4205,cat:'tourism',desc:'Ancient city associated with Buddha and Mahavira. Hot springs, Buddhist monasteries and Vishwa Shanti Stupa.',wiki:'Rajgir'},
+    {name:'Hundru Falls',city:'ranchi',state:'jharkhand',lat:23.2967,lon:85.7167,cat:'natural',desc:'Spectacular 98-metre waterfall on the Subarnarekha river. One of the highest waterfalls in Jharkhand.',wiki:'Hundru_Falls'},
+
+    // Odisha
+    {name:'Jagannath Temple Puri',city:'puri',state:'odisha',lat:19.8051,lon:85.8168,cat:'religion',desc:'One of the four sacred Char Dham pilgrimage sites. Dedicated to Lord Jagannath. Famous for Rath Yatra chariot festival.',wiki:'Jagannath_Temple,_Puri'},
+    {name:'Chilika Lake',city:'chilika',state:'odisha',lat:19.7193,lon:85.3174,cat:'natural',desc:'Largest coastal lagoon in India and second largest in the world. Famous for Irrawaddy dolphins and migratory birds.',wiki:'Chilika_Lake'},
+    {name:'Lingaraj Temple',city:'bhubaneswar',state:'odisha',lat:20.2353,lon:85.8325,cat:'religion',desc:'11th century Shiva temple. Largest temple in Bhubaneswar. Finest example of Kalinga architecture.',wiki:'Lingaraj_Temple'},
+
+    // Goa
+    {name:'Basilica of Bom Jesus',city:'goa',state:'goa',lat:15.5009,lon:73.9116,cat:'historic',desc:'UNESCO World Heritage Site. 16th century Baroque church containing the mortal remains of St Francis Xavier.',wiki:'Basilica_of_Bom_Jesus'},
+    {name:'Fort Aguada',city:'goa',state:'goa',lat:15.4943,lon:73.7742,cat:'historic',desc:'17th century Portuguese fort with a lighthouse. Overlooks the Arabian Sea at the mouth of Mandovi river.',wiki:'Fort_Aguada'},
+    {name:'Dudhsagar Waterfalls',city:'goa',state:'goa',lat:15.3144,lon:74.3139,cat:'natural',desc:'Four-tiered waterfall on the Mandovi river. One of India tallest waterfalls at 310 metres. Means Sea of Milk.',wiki:'Dudhsagar_Falls'},
+    {name:'Calangute Beach',city:'goa',state:'goa',lat:15.5488,lon:73.7528,cat:'natural',desc:'Queen of Beaches. Most popular and largest beach in Goa. Known for water sports, beach shacks and nightlife.',wiki:'Calangute'},
+
+    // Northeast India
+    {name:'Kamakhya Temple',city:'guwahati',state:'assam',lat:26.1666,lon:91.7046,cat:'religion',desc:'Most important Shakti Peeth. Ancient temple of Goddess Kamakhya on Nilachal Hill. Centre of Tantric worship.',wiki:'Kamakhya_Temple'},
+    {name:'Majuli Island',city:'majuli',state:'assam',lat:26.9500,lon:94.1667,cat:'tourism',desc:'World largest river island on Brahmaputra river. UNESCO tentative site. Centre of Assamese Vaishnavite culture.',wiki:'Majuli'},
+    {name:'Dzukou Valley',city:'kohima',state:'nagaland',lat:25.5494,lon:94.0672,cat:'natural',desc:'Valley of Flowers of Northeast India. Stunning alpine meadows at 2,438 metres with seasonal flowers.',wiki:'Dzukou_Valley'},
+    {name:'Living Root Bridges',city:'cherrapunji',state:'meghalaya',lat:25.2830,lon:91.7320,cat:'natural',desc:'Unique living bridges made from roots of rubber trees by Khasi tribes. Some are over 500 years old.',wiki:'Living_root_bridges'},
+    {name:'Loktak Lake',city:'imphal',state:'manipur',lat:24.5000,lon:93.8333,cat:'natural',desc:'Largest freshwater lake in Northeast India. Famous for floating phumdis — circular landmasses made of vegetation.',wiki:'Loktak_Lake'},
+
+    // Jammu Kashmir & Ladakh
+    {name:'Pangong Lake',city:'leh',state:'ladakh',lat:33.7644,lon:78.6642,cat:'natural',desc:'Stunning high-altitude lake at 4,350 metres. Extends from India to China. Famous for its changing blue colours.',wiki:'Pangong_Lake'},
+    {name:'Nubra Valley',city:'nubra',state:'ladakh',lat:34.6500,lon:77.5167,cat:'natural',desc:'Cold desert valley at 3,048 metres. Famous for double-humped Bactrian camels and sand dunes at Hunder.',wiki:'Nubra_Valley'},
+    {name:'Leh Palace',city:'leh',state:'ladakh',lat:34.1658,lon:77.5853,cat:'historic',desc:'17th century nine-storey palace overlooking Leh. Modelled after Potala Palace in Lhasa. Stunning mountain views.',wiki:'Leh_Palace'},
+    {name:'Vaishno Devi Temple',city:'katra',state:'jammu kashmir',lat:32.9901,lon:74.9524,cat:'religion',desc:'One of the most visited pilgrimage sites in India with over 8 million visitors annually. Cave shrine of Goddess Vaishno Devi.',wiki:'Vaishno_Devi'},
+    {name:'Gulmarg Ski Resort',city:'gulmarg',state:'jammu kashmir',lat:34.0494,lon:74.3805,cat:'tourism',desc:'India premier ski resort at 2,650 metres. Has one of the highest cable cars in the world — the Gondola.',wiki:'Gulmarg'},
+
+    // Andhra Pradesh & Telangana (additional)
+    {name:'Golconda Fort',city:'hyderabad',state:'telangana',lat:17.3833,lon:78.4011,cat:'historic',desc:'Magnificent 16th century Qutb Shahi fort. Famous for its acoustics and the Fateh Darwaza. Source of famous Kohinoor diamond.',wiki:'Golconda_Fort'},
+    {name:'Araku Valley',city:'visakhapatnam',state:'andhra pradesh',lat:18.3294,lon:82.8736,cat:'natural',desc:'Scenic valley at 900 metres with coffee plantations, tribal culture and the breathtaking Borra Caves.',wiki:'Araku_Valley'},
+    {name:'Lepakshi Temple',city:'lepakshi',state:'andhra pradesh',lat:13.8050,lon:77.6056,cat:'historic',desc:'16th century Vijayanagara temple famous for a hanging pillar that does not touch the ground. Intricate murals.',wiki:'Lepakshi'},
+
+    // Chhattisgarh
+    {name:'Chitrakote Waterfalls',city:'jagdalpur',state:'chhattisgarh',lat:19.2075,lon:81.7025,cat:'natural',desc:'Widest waterfall in India. Often called the Niagara of India. Located on the Indravati river.',wiki:'Chitrakote_Falls'},
+    {name:'Bastar Danteshwari Temple',city:'jagdalpur',state:'chhattisgarh',lat:18.8789,lon:81.9481,cat:'religion',desc:'One of the 52 Shakti Peethas. Ancient temple in the dense forests of Bastar. Centre of tribal culture.',wiki:'Danteshwari_Temple'},
+
+    // Sikkim & Arunachal
+    {name:'Gurudongmar Lake',city:'north sikkim',state:'sikkim',lat:27.9833,lon:88.7167,cat:'natural',desc:'One of the highest lakes in the world at 5,148 metres. Sacred to both Hindus and Buddhists. Does not freeze completely.',wiki:'Gurudongmar_Lake'},
+    {name:'Tawang Monastery',city:'tawang',state:'arunachal pradesh',lat:27.5869,lon:91.8594,cat:'religion',desc:'Largest monastery in India and second largest in the world. 17th century Gelugpa Tibetan Buddhist monastery.',wiki:'Tawang_Monastery'},
+    {name:'Ziro Valley',city:'ziro',state:'arunachal pradesh',lat:27.5467,lon:93.8283,cat:'natural',desc:'UNESCO tentative World Heritage Site. Scenic valley of the Apatani tribe with paddy fields and pine hills.',wiki:'Ziro,_Arunachal_Pradesh'},
+
+    // More missing important places
+    {name:'Char Dham Yamunotri',city:'yamunotri',state:'uttarakhand',lat:31.0145,lon:78.4547,cat:'religion',desc:'Source of River Yamuna and one of the four Char Dham pilgrimage sites. Temple dedicated to Goddess Yamuna at 3,293 metres.',wiki:'Yamunotri'},
+    {name:'Gangotri Temple',city:'gangotri',state:'uttarakhand',lat:30.9945,lon:78.9389,cat:'religion',desc:'One of the four Char Dham. Origin of River Ganga. Temple at 3,048 metres dedicated to Goddess Ganga.',wiki:'Gangotri'},
+    {name:'Rishikesh Laxman Jhula',city:'rishikesh',state:'uttarakhand',lat:30.1270,lon:78.3222,cat:'tourism',desc:'Iconic suspension bridge over the Ganga in Rishikesh. Yoga capital of the world. Famous for river rafting and ashrams.',wiki:'Rishikesh'},
+    {name:'Haridwar Har Ki Pauri',city:'haridwar',state:'uttarakhand',lat:29.9581,lon:78.1647,cat:'religion',desc:'The most sacred ghat in Haridwar. Evening Ganga Aarti here draws thousands daily. One of the Kumbh Mela sites.',wiki:'Har_ki_Pauri'},
+
+    // Delhi (additional)
+    {name:'Humayun Tomb',city:'delhi',state:'delhi',lat:28.5933,lon:77.2507,cat:'historic',desc:'UNESCO World Heritage Site. First garden tomb in India. Inspired the design of the Taj Mahal. Built in 1570.',wiki:'Humayuns_Tomb'},
+    {name:'Akshardham Temple Delhi',city:'delhi',state:'delhi',lat:28.6127,lon:77.2773,cat:'religion',desc:'Spectacular Hindu temple complex on the banks of Yamuna. Largest Hindu temple complex in the world by Guinness World Records.',wiki:'Swaminarayan_Akshardham_(Delhi)'},
+    {name:'Jama Masjid Delhi',city:'delhi',state:'delhi',lat:28.6507,lon:77.2334,cat:'historic',desc:'Largest mosque in India. Built by Mughal Emperor Shah Jahan in 1656. Can accommodate 25,000 worshippers.',wiki:'Jama_Masjid,_Delhi'},
+    {name:'Chandni Chowk',city:'delhi',state:'delhi',lat:28.6506,lon:77.2303,cat:'tourism',desc:'One of the oldest and busiest markets in India. Built by Mughal Emperor Shah Jahan in 17th century. Famous for street food and wholesale markets.',wiki:'Chandni_Chowk'},
+
+    // Gujarat (additional)
+    {name:'Akshardham Gandhinagar',city:'gandhinagar',state:'gujarat',lat:23.2156,lon:72.6369,cat:'religion',desc:'Magnificent Swaminarayan temple complex. Largest temple campus in the world with 6,000 tonnes of pink sandstone.',wiki:'Swaminarayan_Akshardham_(Gandhinagar)'},
+    {name:'Rani ki Vav Patan',city:'patan',state:'gujarat',lat:23.8588,lon:72.1022,cat:'historic',desc:'UNESCO World Heritage Site. Intricately constructed stepwell built in 11th century. Considered finest stepwell in India.',wiki:'Rani_ki_vav'},
+    {name:'Sidi Saiyyed Mosque',city:'ahmedabad',state:'gujarat',lat:23.0301,lon:72.5800,cat:'historic',desc:'16th century mosque famous for its exquisitely carved stone latticework jaali screens. Symbol of Ahmedabad.',wiki:'Sidi_Saiyyed_Mosque'},
+    {name:'Sabarmati Ashram',city:'ahmedabad',state:'gujarat',lat:23.0596,lon:72.5806,cat:'historic',desc:'Mahatma Gandhi ashram on the banks of Sabarmati river. From here he launched the historic Dandi Salt March in 1930.',wiki:'Sabarmati_Ashram'},
+
+    // Rajasthan (additional)
+    {name:'Jaipur City Palace',city:'jaipur',state:'rajasthan',lat:26.9258,lon:75.8237,cat:'historic',desc:'Magnificent palace complex in the heart of Jaipur. Part museum, part royal residence. Stunning blend of Rajput and Mughal architecture.',wiki:'City_Palace,_Jaipur'},
+    {name:'Ranakpur Jain Temple',city:'ranakpur',state:'rajasthan',lat:25.1162,lon:73.4722,cat:'religion',desc:'15th century Jain temple with 1,444 intricately carved marble pillars. No two pillars are alike. One of the finest Jain temples.',wiki:'Ranakpur_Jain_temple'},
+    {name:'Chittorgarh Fort',city:'chittorgarh',state:'rajasthan',lat:24.8887,lon:74.6269,cat:'historic',desc:'UNESCO World Heritage Site. Largest fort in India. Symbol of Rajput valour. Famous for the stories of Padmini and Mirabai.',wiki:'Chittorgarh_Fort'},
+    {name:'Kumbhalgarh Fort',city:'kumbhalgarh',state:'rajasthan',lat:25.1483,lon:73.5883,cat:'historic',desc:'UNESCO World Heritage Site. Has the second longest wall in the world after the Great Wall of China. Birthplace of Maharana Pratap.',wiki:'Kumbhalgarh'},
+
+    // Maharashtra (additional)
+    {name:'Siddhivinayak Temple Mumbai',city:'mumbai',state:'maharashtra',lat:19.0170,lon:72.8302,cat:'religion',desc:'Most famous Ganesh temple in India. Over 25,000 devotees visit daily. One of the richest temples in Maharashtra.',wiki:'Siddhivinayak_Temple,_Mumbai'},
+    {name:'Haji Ali Dargah',city:'mumbai',state:'maharashtra',lat:18.9827,lon:72.8089,cat:'religion',desc:'Iconic mosque and dargah located on a tiny islet in the Arabian Sea. Connected to shore by a narrow causeway. 600 year old shrine.',wiki:'Haji_Ali_Dargah'},
+    {name:'Elephanta Caves',city:'mumbai',state:'maharashtra',lat:18.9633,lon:72.9315,cat:'historic',desc:'UNESCO World Heritage Site. Rock-cut caves on Elephanta Island with massive sculptures of Hindu deities. 6th century.',wiki:'Elephanta_Caves'},
+    {name:'Shani Shingnapur',city:'ahmednagar',state:'maharashtra',lat:19.6833,lon:74.7333,cat:'religion',desc:'Famous temple where Lord Shani is worshipped as a self-manifested deity. Village famous for having no doors on houses.',wiki:'Shani_Shingnapur'},
+
+    // Madhya Pradesh (additional)
+    {name:'Mahakaleshwar Ujjain Corridor',city:'ujjain',state:'madhya pradesh',lat:23.1828,lon:75.7682,cat:'religion',desc:'The newly developed Mahakal Lok corridor in Ujjain is one of the grandest temple corridors in India, spanning 900 metres with 108 pillars.',wiki:'Mahakaleshwar_Jyotirlinga'},
+    {name:'Amarkantak',city:'amarkantak',state:'madhya pradesh',lat:22.6742,lon:81.7553,cat:'religion',desc:'Origin of sacred rivers Narmada, Son and Johila. Known as the Meeting Point of the Vindhya and Satpura ranges. Important pilgrimage site.',wiki:'Amarkantak'},
+    {name:'Bhimbetka Rock Shelters',city:'bhopal',state:'madhya pradesh',lat:22.9386,lon:77.6121,cat:'historic',desc:'UNESCO World Heritage Site. Rock shelters with prehistoric cave paintings dating back 30,000 years. Evidence of earliest human life in India.',wiki:'Bhimbetka_rock_shelters'},
+
+    // Karnataka (additional)
+    {name:'Udupi Krishna Temple',city:'udupi',state:'karnataka',lat:13.3409,lon:74.7478,cat:'religion',desc:'Ancient Krishna temple with unique window worship tradition. One of the most important Vaishnava pilgrimage centres in South India.',wiki:'Krishna_Matha,_Udupi'},
+    {name:'Murudeshwar Temple',city:'murudeshwar',state:'karnataka',lat:14.0942,lon:74.1041,cat:'religion',desc:'Famous Shiva temple with a 20-storey gopura and the second tallest Shiva statue in the world at 123 feet.',wiki:'Murudeshwar'},
+    {name:'Kollur Mookambika Temple',city:'kollur',state:'karnataka',lat:13.8579,lon:74.8157,cat:'religion',desc:'Famous temple of Goddess Mookambika in the Western Ghats. One of the most important Shakti shrines in South India.',wiki:'Mookambika_Temple'},
+
+    // Andhra Pradesh (additional)
+    {name:'Amaravati Stupa',city:'amaravati',state:'andhra pradesh',lat:16.5769,lon:80.3561,cat:'historic',desc:'Ancient Buddhist stupa from 3rd century BCE. One of the great monuments of Buddhist art. On the banks of Krishna river.',wiki:'Amaravati_Stupa'},
+    {name:'Srikalahasti Temple',city:'srikalahasti',state:'andhra pradesh',lat:13.7499,lon:79.6987,cat:'religion',desc:'Famous Shiva temple known as the Kailash of the South. One of the Panchabootha Stalas representing the element of air.',wiki:'Srikalahasti_temple'},
+
+    // Telangana (additional)
+    {name:'Thousand Pillar Temple Warangal',city:'warangal',state:'telangana',lat:17.9784,lon:79.5941,cat:'historic',desc:'12th century Kakatiya dynasty temple with intricately carved pillars, sculptures and a monolithic Nandi bull.',wiki:'Thousand_pillar_temple'},
+    {name:'Ramappa Temple',city:'warangal',state:'telangana',lat:18.0566,lon:79.9568,cat:'historic',desc:'UNESCO World Heritage Site. 13th century Kakatiya temple built with floating bricks. One of the finest medieval temples in India.',wiki:'Ramappa_temple'},
+
+    // Bihar (additional)
+    {name:'Vishnupad Temple Gaya',city:'gaya',state:'bihar',lat:24.7963,lon:84.9987,cat:'religion',desc:'Sacred Vishnu temple where Pitru Paksha rituals are performed. Footprint of Lord Vishnu is enshrined here. Important Hindu pilgrimage.',wiki:'Vishnupad_Temple'},
+    {name:'Rajgir Nalanda Circuit',city:'nalanda',state:'bihar',lat:25.1358,lon:85.4438,cat:'historic',desc:'Ancient Nalanda University ruins — UNESCO World Heritage Site. Once the greatest centre of learning in the ancient world.',wiki:'Nalanda'},
+
+    // Sikkim (additional)
+    {name:'Rumtek Monastery',city:'gangtok',state:'sikkim',lat:27.2975,lon:88.6139,cat:'religion',desc:'Largest monastery in Sikkim. Seat of the Kagyu order of Tibetan Buddhism. Stunning views of Kanchenjunga.',wiki:'Rumtek_Monastery'},
+    {name:'Nathula Pass',city:'gangtok',state:'sikkim',lat:27.3867,lon:88.8267,cat:'tourism',desc:'High mountain pass at 4,310 metres on India-China border. Part of ancient Silk Road trade route. Open to Indian tourists.',wiki:'Nathu_La'},
+
+    // Puducherry
+    {name:'Auroville',city:'puducherry',state:'pondicherry',lat:12.0069,lon:79.8116,cat:'tourism',desc:'Experimental international township founded in 1968. The Matrimandir golden sphere at its centre is a place for silent concentration.',wiki:'Auroville'},
+    {name:'Sri Aurobindo Ashram',city:'puducherry',state:'pondicherry',lat:11.9362,lon:79.8310,cat:'religion',desc:'Spiritual community founded by Sri Aurobindo and The Mother. Attracts spiritual seekers from around the world.',wiki:'Sri_Aurobindo_Ashram'},
+
+    // Lakshadweep & Andaman
+    {name:'Havelock Island Radhanagar Beach',city:'havelock',state:'andaman nicobar',lat:11.9810,lon:92.9877,cat:'natural',desc:'Rated one of the best beaches in Asia. Crystal clear turquoise water and white sand. Ideal for snorkelling and diving.',wiki:'Havelock_Island'},
+    {name:'Cellular Jail Port Blair',city:'port blair',state:'andaman nicobar',lat:11.6704,lon:92.7547,cat:'historic',desc:'National memorial also known as Kala Pani. Colonial prison used by British to exile freedom fighters. Haunting light and sound show.',wiki:'Cellular_Jail'},
+  ];
+
+  function getFamousForQuery(query, cityName) {
+    const q = (query + ' ' + cityName).toLowerCase();
+    return FAMOUS_PLACES.filter(p => q.includes(p.state) || q.includes(p.city));
+  }
+
+async function fetchPlaces(lat, lon, limit, radiusOverride) {
+  const radius = radiusOverride || 25000; // 25km default radius
+
+  // Build Overpass query based on active filter — no API key needed
+  let osmFilters = '';
+  if (activeFilter === 'all' || activeFilter === 'religion') {
+    osmFilters += 'node["amenity"~"place_of_worship|temple|mosque|church|monastery"](around:' + radius + ',' + lat + ',' + lon + ');';
+    osmFilters += 'way["amenity"~"place_of_worship|temple|mosque|church|monastery"](around:' + radius + ',' + lat + ',' + lon + ');';
+  }
+  if (activeFilter === 'all' || activeFilter === 'historic') {
+    osmFilters += 'node["historic"](around:' + radius + ',' + lat + ',' + lon + ');';
+    osmFilters += 'way["historic"](around:' + radius + ',' + lat + ',' + lon + ');';
+  }
+  if (activeFilter === 'all' || activeFilter === 'natural') {
+    osmFilters += 'node["natural"~"peak|waterfall|beach|lake|hot_spring"](around:' + radius + ',' + lat + ',' + lon + ');';
+    osmFilters += 'node["leisure"~"nature_reserve|park|garden"](around:' + radius + ',' + lat + ',' + lon + ');';
+  }
+  if (activeFilter === 'all' || activeFilter === 'tourism') {
+    osmFilters += 'node["tourism"~"attraction|viewpoint|museum|artwork|zoo|theme_park"](around:' + radius + ',' + lat + ',' + lon + ');';
+    osmFilters += 'way["tourism"~"attraction|viewpoint|museum|artwork|zoo|theme_park"](around:' + radius + ',' + lat + ',' + lon + ');';
+  }
+  if (activeFilter === 'all' || activeFilter === 'leisure') {
+    osmFilters += 'node["leisure"~"park|garden|stadium|sports_centre|golf_course|water_park"](around:' + radius + ',' + lat + ',' + lon + ');';
+    osmFilters += 'way["leisure"~"park|garden|stadium|sports_centre"](around:' + radius + ',' + lat + ',' + lon + ');';
+  }
+
+  const query = '[out:json][timeout:25];(' + osmFilters + ');out body center ' + (limit * 4) + ';';
+  const url = 'https://overpass-api.de/api/interpreter';
+
+  const r = await fetch(url, {
+    method: 'POST',
+    body: query,
+    mode: 'cors'
+  });
+  if (!r.ok) throw new Error('Could not load places. Please try again.');
+  const d = await r.json();
+  if (!d.elements) throw new Error('No data returned. Please try again.');
+
+  // Filter — must have a name
+  const named = d.elements.filter(e => e.tags && e.tags.name);
+
+  // Sort by importance — prefer entries with more tags
+  named.sort((a, b) => Object.keys(b.tags).length - Object.keys(a.tags).length);
+
+  return named.slice(0, limit * 2);
+}
+
+// No longer needed but kept to avoid breaking references
+async function fetchPlaceDetail(xid) { return null; }
+
+function getCatInfo(tags) {
+  const t = tags || {};
+  const amenity = (t.amenity || '').toLowerCase();
+  const historic = (t.historic || '').toLowerCase();
+  const tourism = (t.tourism || '').toLowerCase();
+  const leisure = (t.leisure || '').toLowerCase();
+  const natural = (t.natural || '').toLowerCase();
+  const religion = (t.religion || '').toLowerCase();
+  const name = (t.name || '').toLowerCase();
+
+  if (amenity.includes('place_of_worship') || amenity.includes('temple') || amenity.includes('mosque') || amenity.includes('church') || amenity.includes('monastery') || name.includes('temple') || name.includes('mandir') || name.includes('masjid') || name.includes('gurudwara') || name.includes('church') || name.includes('dargah'))
+    return { label: '🛕 Religious', color: '#fef3c7', text: '#92400e' };
+  if (historic || name.includes('fort') || name.includes('palace') || name.includes('mahal') || name.includes('memorial') || name.includes('ruins') || name.includes('monument'))
+    return { label: '🏛️ Historic', color: '#ede9fe', text: '#5b21b6' };
+  if (natural || name.includes('waterfall') || name.includes('lake') || name.includes('mountain') || name.includes('peak') || name.includes('forest') || name.includes('beach'))
+    return { label: '🌿 Nature', color: '#d1fae5', text: '#065f46' };
+  if (tourism.includes('museum'))
+    return { label: '🏛️ Museum', color: '#ede9fe', text: '#5b21b6' };
+  if (tourism.includes('viewpoint'))
+    return { label: '👁️ Viewpoint', color: '#e0f2fe', text: '#0c4a6e' };
+  if (leisure.includes('park') || leisure.includes('garden') || name.includes('park') || name.includes('garden') || name.includes('bagh'))
+    return { label: '🌸 Park/Garden', color: '#dcfce7', text: '#166534' };
+  if (tourism.includes('attraction') || tourism.includes('artwork') || tourism.includes('zoo') || tourism.includes('theme_park'))
+    return { label: '⭐ Attraction', color: '#fef3c7', text: '#92400e' };
+  return { label: '📍 Point of Interest', color: '#f1f5f9', text: '#475569' };
+}
+
+function mapsLink(name, lat, lon) {
+  return `https://www.google.com/maps/search/${encodeURIComponent(name)}/@${lat},${lon},15z`;
+}
+
+function hotelLink(cityName) {
+  const encoded = encodeURIComponent(cityName);
+  return AFFILIATES.makemytrip + `?city=${encoded}`;
+}
+
+async function searchPlaces() {
+  const query = document.getElementById('city-input').value.trim();
+  if (!query) return;
+  const limit = Math.min(parseInt(document.getElementById('count-input').value) || 5, 20);
+
+  document.getElementById('search-btn').disabled = true;
+  showLoading(true, `Finding top places in ${query}…`);
+
+  try {
+    // Step 1: Geocode
+    const place = await geocodeCity(query);
+    lastCoords = { lat: place.latitude, lon: place.longitude };
+    lastCity = place.name + (place.admin1 ? ', ' + place.admin1 : '');
+    document.getElementById('load-text').textContent = `Loading attractions in ${lastCity}…`;
+
+    // Step 2: Fetch places — use larger radius for states/regions
+    const q = query.toLowerCase();
+    const isState = ['gujarat','rajasthan','maharashtra','karnataka','kerala','tamil','uttar pradesh','madhya pradesh','goa','himachal','uttarakhand','punjab','haryana','bihar','odisha','assam','bengal','andhra','telangana','jharkhand','chhattisgarh'].some(s => q.includes(s));
+    const searchRadius = isState ? 80000 : 25000;
+
+    // Get famous places for this query
+    const famousMatches = getFamousForQuery(query, place.name);
+
+    let osmPlaces = [];
+    try {
+      osmPlaces = await fetchPlaces(place.latitude, place.longitude, limit, searchRadius);
+    } catch(e) {
+      if (famousMatches.length === 0) throw e;
+      // If Overpass fails but we have famous places, continue with those
+    }
+
+    // Convert famous places to OSM-like format and merge
+    const famousFormatted = famousMatches.map(fp => ({
+      tags: {
+        name: fp.name,
+        tourism: fp.cat === 'tourism' ? 'attraction' : '',
+        historic: fp.cat === 'historic' ? 'yes' : '',
+        amenity: fp.cat === 'religion' ? 'place_of_worship' : '',
+        natural: fp.cat === 'natural' ? 'yes' : '',
+        leisure: fp.cat === 'leisure' ? 'park' : '',
+        description: fp.desc,
+        wikipedia: fp.wiki,
+      },
+      lat: fp.lat,
+      lon: fp.lon,
+      _famous: true
+    }));
+
+    // Famous places first, then OSM results (deduped by name)
+    const osmNames = new Set(osmPlaces.map(p => (p.tags && p.tags.name || '').toLowerCase()));
+    const uniqueFamous = famousFormatted.filter(f => !osmNames.has(f.tags.name.toLowerCase()));
+    const combined = [...uniqueFamous, ...osmPlaces];
+
+    if (combined.length === 0) {
+      showLoading(false);
+      showError('No attractions found for "' + query + '". Try a specific city name like "Vadodara" or "Ahmedabad".');
+      document.getElementById('search-btn').disabled = false;
+      return;
+    }
+
+    // Step 3: Store and render
+    lastResults = combined;
+    renderPlaces(filterResults(lastResults));
+    showLoading(false);
+    document.getElementById('results-area').style.display = 'block';
+
+  } catch(e) {
+    showLoading(false);
+    showError('⚠️ ' + e.message + (window.location.protocol === 'file:' ? ' (Upload to your website for full functionality)' : ''));
+  }
+
+  document.getElementById('search-btn').disabled = false;
+}
+
+function renderPlaces(places) {
+  const limit = Math.min(parseInt(document.getElementById('count-input').value) || 5, 20);
+
+  document.getElementById('results-title').textContent = `Top ${Math.min(places.length, limit)} Places in ${lastCity}`;
+  document.getElementById('results-sub').textContent = places.length + ' attractions found · Data from OpenStreetMap';
+
+  if (places.length === 0) {
+    document.getElementById('places-grid').innerHTML = `<div class="no-results" style="grid-column:1/-1"><div class="nr-icon">🔍</div><p>No places match this filter. Try "All" or a different category.</p></div>`;
+    return;
+  }
+
+  let html = '';
+  places.slice(0, limit).forEach((p, i) => {
+    const tags = p.tags || {};
+    const cat = getCatInfo(tags);
+
+    // Name
+    const name = tags.name || tags['name:en'] || 'Unnamed Place';
+
+    // Coordinates — Overpass nodes have lat/lon directly, ways have center
+    const lat = p.lat || (p.center && p.center.lat) || lastCoords.lat;
+    const lon = p.lon || (p.center && p.center.lon) || lastCoords.lon;
+
+    // Address from tags
+    const addrParts = [
+      tags['addr:street'] || tags['addr:road'],
+      tags['addr:suburb'] || tags['addr:locality'],
+      tags['addr:city'] || tags['addr:town'] || tags['addr:village'],
+      tags['addr:state']
+    ].filter(Boolean);
+    const addrStr = addrParts.length > 0 ? addrParts.join(', ') : 'Near ' + lastCity;
+
+    // Description — use OSM description or Wikipedia link or generate one
+    const desc = tags.description
+      || tags['description:en']
+      || (tags.wikipedia ? 'Referenced on Wikipedia — click Wiki button for full details.' : '')
+      || (tags.opening_hours ? 'Hours: ' + tags.opening_hours + '. ' : '')
+      || 'A notable ' + cat.label.replace(/[^\w\s]/g, '').trim().toLowerCase() + ' in ' + lastCity + '. Click Maps for directions.';
+
+    // Wikipedia link
+    const wikiRef = tags.wikipedia || tags['wikipedia:en'] || '';
+    const wikiTitle = wikiRef.includes(':') ? wikiRef.split(':').pop() : wikiRef;
+    const wikiUrl = wikiTitle ? 'https://en.wikipedia.org/wiki/' + encodeURIComponent(wikiTitle) : '';
+
+    // Website
+    const website = tags.website || tags.url || '';
+
+    const emojiHtml = '<div class="place-img" style="display:flex;font-size:2.5rem">' + cat.label.split(' ')[0] + '</div>';
+
+    html += '<div class="place-card">' +
+      emojiHtml +
+      '<div class="place-body">' +
+        '<div class="place-rank">#' + (i+1) + '</div>' +
+        '<div class="place-name">' + name + '</div>' +
+        '<span class="place-cat" style="background:' + cat.color + ';color:' + cat.text + '">' + cat.label + '</span>' +
+        '<div class="place-address">📍 ' + addrStr + '</div>' +
+        '<div class="place-desc">' + desc + '</div>' +
+        '<div class="place-actions">' +
+          '<a class="place-btn btn-maps" href="' + mapsLink(name, lat, lon) + '" target="_blank">🗺️ Maps</a>' +
+          (wikiUrl ? '<a class="place-btn btn-wiki" href="' + wikiUrl + '" target="_blank">📖 Wiki</a>' : '') +
+          (website ? '<a class="place-btn btn-wiki" href="' + website + '" target="_blank">🌐 Website</a>' : '') +
+          '<a class="place-btn btn-hotels" href="' + hotelLink(lastCity) + '" target="_blank">🏨 Hotels</a>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  });
+
+  document.getElementById('places-grid').innerHTML = html;
+}
+</script>
+</body>
+</html>
