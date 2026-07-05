@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Top Places Explorer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@700;800&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f7f8fa;
+    --surface: #ffffff;
+    --dark: #111827;
+    --gray: #6b7280;
+    --border: #e5e7eb;
+    --accent: #2563eb;
+    --accent-light: #eff6ff;
+    --green: #059669;
+    --orange: #d97706;
+    --purple: #7c3aed;
+    --red: #dc2626;
+  }
+  body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--dark); min-height: 100vh; padding: 28px 16px; }
+  .wrapper { max-width: 860px; margin: 0 auto; }
+
+  .header { text-align: center; margin-bottom: 32px; }
+  .eyebrow { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+  .header h1 { font-family: 'Outfit', sans-serif; font-size: clamp(1.8rem,5vw,2.6rem); font-weight: 800; color: var(--dark); margin-bottom: 8px; letter-spacing: -0.02em; }
+  .header p { color: var(--gray); font-size: 0.9rem; }
+
+  .search-card { background: var(--surface); border-radius: 20px; padding: 24px; border: 1.5px solid var(--border); margin-bottom: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.04); }
+  .search-row { display: flex; gap: 10px; margin-bottom: 14px; }
+  .search-input { flex: 1; background: var(--bg); border: 2px solid var(--border); border-radius: 12px; padding: 13px 16px; font-size: 0.95rem; font-family: 'Inter', sans-serif; color: var(--dark); outline: none; transition: border-color 0.2s; }
+  .search-input:focus { border-color: var(--accent); background: var(--surface); }
+  .search-input::placeholder { color: #9ca3af; }
+  .search-btn { background: var(--accent); color: white; font-weight: 700; font-size: 0.9rem; border: none; border-radius: 12px; padding: 13px 22px; cursor: pointer; transition: all 0.2s; white-space: nowrap; font-family: 'Inter', sans-serif; }
+  .search-btn:hover { background: #1d4ed8; transform: translateY(-1px); }
+  .search-btn:disabled { background: #9ca3af; transform: none; cursor: not-allowed; }
+
+  .filters { display: flex; gap: 8px; flex-wrap: wrap; }
+  .filter-btn { border: 1.5px solid var(--border); border-radius: 20px; padding: 6px 14px; font-size: 0.78rem; font-weight: 600; cursor: pointer; background: none; color: var(--gray); transition: all 0.18s; font-family: 'Inter', sans-serif; }
+  .filter-btn.active { border-color: var(--accent); background: var(--accent-light); color: var(--accent); }
+
+  .count-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; font-size: 0.82rem; color: var(--gray); }
+  .count-input { width: 60px; border: 1.5px solid var(--border); border-radius: 8px; padding: 5px 8px; font-size: 0.88rem; font-family: 'Inter', sans-serif; color: var(--dark); text-align: center; outline: none; }
+  .count-input:focus { border-color: var(--accent); }
+
+  .error-msg { background: #fef2f2; border: 1.5px solid #fca5a5; border-radius: 12px; padding: 14px 16px; font-size: 0.85rem; color: var(--red); margin-bottom: 16px; display: none; }
+  .error-msg.show { display: block; }
+
+  .loading { text-align: center; padding: 48px 20px; color: var(--gray); display: none; }
+  .loading.show { display: block; }
+  .spin { display: inline-block; font-size: 2.4rem; animation: spin 1s linear infinite; margin-bottom: 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .load-text { font-size: 0.9rem; color: var(--gray); }
+
+  .results-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+  .results-title { font-family: 'Outfit', sans-serif; font-size: 1.1rem; font-weight: 700; color: var(--dark); }
+  .results-sub { font-size: 0.78rem; color: var(--gray); }
+
+  .places-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  @media (max-width: 600px) { .places-grid { grid-template-columns: 1fr; } }
+
+  .place-card { background: var(--surface); border-radius: 18px; border: 1.5px solid var(--border); overflow: hidden; transition: all 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  .place-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); border-color: var(--accent); }
+
+  .place-img { width: 100%; height: 160px; object-fit: cover; background: linear-gradient(135deg, #dbeafe, #ede9fe); display: flex; align-items: center; justify-content: center; font-size: 3.5rem; }
+  .place-img.has-image { display: block; }
+
+  .place-body { padding: 16px; }
+  .place-rank { display: inline-flex; align-items: center; gap: 4px; background: var(--accent); color: white; font-size: 0.68rem; font-weight: 800; padding: 2px 8px; border-radius: 20px; margin-bottom: 8px; }
+  .place-name { font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 700; color: var(--dark); margin-bottom: 4px; line-height: 1.3; }
+  .place-cat { display: inline-block; font-size: 0.7rem; font-weight: 600; padding: 2px 9px; border-radius: 20px; margin-bottom: 8px; text-transform: capitalize; }
+  .place-address { font-size: 0.78rem; color: var(--gray); margin-bottom: 10px; display: flex; align-items: flex-start; gap: 5px; line-height: 1.5; }
+  .place-desc { font-size: 0.8rem; color: #4b5563; line-height: 1.6; margin-bottom: 12px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .place-actions { display: flex; gap: 8px; }
+  .place-btn { flex: 1; padding: 8px; border-radius: 9px; font-size: 0.75rem; font-weight: 700; cursor: pointer; text-align: center; text-decoration: none; transition: all 0.18s; border: none; font-family: 'Inter', sans-serif; }
+  .btn-maps { background: #ecfdf5; color: var(--green); border: 1.5px solid #a7f3d0; }
+  .btn-maps:hover { background: #d1fae5; }
+  .btn-wiki { background: var(--accent-light); color: var(--accent); border: 1.5px solid #bfdbfe; }
+  .btn-wiki:hover { background: #dbeafe; }
+  .btn-hotels { background: #fff7ed; color: var(--orange); border: 1.5px solid #fed7aa; }
+  .btn-hotels:hover { background: #ffedd5; }
+
+  .no-results { text-align: center; padding: 48px 20px; color: var(--gray); }
+  .no-results .nr-icon { font-size: 3rem; margin-bottom: 12px; }
+
+  .popular-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .pop-tag { background: var(--accent-light); color: var(--accent); border: 1.5px solid #bfdbfe; border-radius: 20px; padding: 5px 13px; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: all 0.18s; }
+  .pop-tag:hover { background: #dbeafe; }
+
+  .local-warn { background: #fffbeb; border: 1.5px solid #fcd34d; border-radius: 12px; padding: 12px 16px; font-size: 0.82rem; color: #92400e; margin-bottom: 16px; display: none; }
+  .local-warn.show { display: block; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <div class="header">
+    <div class="eyebrow">🗺️ Travel Discovery</div>
+    <h1>Top Places Explorer</h1>
+    <p>Discover top attractions, temples, markets & hidden gems for any city in India</p>
+  </div>
+
+  <div class="local-warn" id="local-warn">
+    ⚠️ <strong>Upload to your website for best results.</strong> Some features may be limited when running as a local file.
+  </div>
+
+  <div class="search-card">
+    <div class="search-row">
+      <input type="text" class="search-input" id="city-input"
+        placeholder="Enter a place e.g. McLeodganj Himachal Pradesh, Dwarka Gujarat, Chandigarh…"
+        onkeydown="if(event.key==='Enter') searchPlaces()">
+      <button class="search-btn" id="search-btn" onclick="searchPlaces()">🔍 Explore</button>
+    </div>
+
+    <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap">
+      <div class="count-row">
+        Show top
+        <input type="number" class="count-input" id="count-input" value="5" min="1" max="20">
+        places
+      </div>
+      <div class="filters" id="filters">
+        <button class="filter-btn active" data-kind="all" onclick="setFilter('all',this)">🌟 All</button>
+        <button class="filter-btn" data-kind="religion" onclick="setFilter('religion',this)">🛕 Temples</button>
+        <button class="filter-btn" data-kind="historic" onclick="setFilter('historic',this)">🏛️ Historic</button>
+        <button class="filter-btn" data-kind="natural" onclick="setFilter('natural',this)">🌿 Nature</button>
+        <button class="filter-btn" data-kind="tourism" onclick="setFilter('tourism',this)">🎡 Tourism</button>
+        <button class="filter-btn" data-kind="leisure" onclick="setFilter('leisure',this)">🏖️ Leisure</button>
+      </div>
+    </div>
+
+    <div style="margin-top:14px">
+      <div style="font-size:0.75rem;color:var(--gray);margin-bottom:8px;font-weight:600">🔥 Popular Searches</div>
+      <div class="popular-tags">
+        <span class="pop-tag" onclick="quickSearch('McLeodganj Himachal Pradesh')">McLeodganj</span>
+        <span class="pop-tag" onclick="quickSearch('Dwarka Gujarat')">Dwarka Gujarat</span>
+        <span class="pop-tag" onclick="quickSearch('Chandigarh Punjab')">Chandigarh</span>
+        <span class="pop-tag" onclick="quickSearch('Rishikesh Uttarakhand')">Rishikesh</span>
+        <span class="pop-tag" onclick="quickSearch('Jaipur Rajasthan')">Jaipur</span>
+        <span class="pop-tag" onclick="quickSearch('Varanasi Uttar Pradesh')">Varanasi</span>
+        <span class="pop-tag" onclick="quickSearch('Shimla Himachal Pradesh')">Shimla</span>
+        <span class="pop-tag" onclick="quickSearch('Agra Uttar Pradesh')">Agra</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="error-msg" id="error-msg"></div>
+  <div class="loading" id="loading">
+    <div class="spin">🗺️</div>
+    <div class="load-text" id="load-text">Searching for top places…</div>
+  </div>
+
+  <div id="results-area" style="display:none">
+    <div class="results-header">
+      <div>
+        <div class="results-title" id="results-title">Top places</div>
+        <div class="results-sub" id="results-sub"></div>
+      </div>
+    </div>
+    <div class="places-grid" id="places-grid"></div>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// AFFILIATE LINKS — REPLACE WITH YOUR AFFILIATE URLs
+// ============================================================
+const AFFILIATES = {
+  makemytrip: 'https://www.makemytrip.com/hotels/',
+  // Replace with: 'https://www.makemytrip.com/hotels/?affid=YOUR_AFFILIATE_ID'
+
+  booking: 'https://www.booking.com/searchresults.html',
+  // Replace with: 'https://www.booking.com/searchresults.html?aid=YOUR_AID'
+
+  goibibo: 'https://www.goibibo.com/hotels/',
+  // Replace with your Goibibo affiliate link
+};
+// ============================================================
+
+let activeFilter = 'all';
+let lastResults = [];
+let lastCity = '';
+let lastCoords = null;
+
+if (window.location.protocol === 'file:') {
+  document.getElementById('local-warn').classList.add('show');
+}
+
+function setFilter(kind, btn) {
+  activeFilter = kind;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (lastResults.length) renderPlaces(filterResults(lastResults));
+}
+
+function filterResults(places) {
+  if (activeFilter === 'all') return places;
+  return places.filter(p => {
+    const tags = p.tags || {};
+    const amenity = (tags.amenity || '').toLowerCase();
+    const historic = (tags.historic || '').toLowerCase();
+    const tourism = (tags.tourism || '').toLowerCase();
+    const leisure = (tags.leisure || '').toLowerCase();
+    const natural = (tags.natural || '').toLowerCase();
+    const name = (tags.name || '').toLowerCase();
+    if (activeFilter === 'religion') return amenity.includes('place_of_worship') || name.includes('temple') || name.includes('mandir') || name.includes('masjid') || name.includes('church') || name.includes('gurudwara') || name.includes('dargah');
+    if (activeFilter === 'historic') return !!historic || name.includes('fort') || name.includes('palace') || name.includes('mahal') || name.includes('memorial');
+    if (activeFilter === 'natural') return !!natural || name.includes('waterfall') || name.includes('lake') || name.includes('beach');
+    if (activeFilter === 'tourism') return !!tourism;
+    if (activeFilter === 'leisure') return !!leisure || name.includes('park') || name.includes('garden');
+    return true;
+  });
+}
+
+function quickSearch(query) {
+  document.getElementById('city-input').value = query;
+  searchPlaces();
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg;
+  el.classList.toggle('show', !!msg);
+}
+
+function showLoading(v, text) {
+  document.getElementById('loading').classList.toggle('show', v);
+  if (text) document.getElementById('load-text').textContent = text;
+  if (v) {
+    document.getElementById('results-area').style.display = 'none';
+    showError('');
+  }
+}
+
+async function geocodeCity(query) {
+  const words = query.trim().split(' ').filter(Boolean);
+  const stateHint = words.length > 1 ? words[words.length-1].toLowerCase() : '';
+  const cityName = words[0];
+
+  function parseNominatim(results) {
+    if (!results || !results.length) return null;
+    const r = results[0];
+    return {
+      latitude: parseFloat(r.lat),
+      longitude: parseFloat(r.lon),
+      name: r.display_name.split(',')[0].trim(),
+      admin1: (r.display_name.split(',')[1] || '').trim(),
+      country: 'India'
+    };
+  }
+
+  function parseOpenMeteo(results) {
+    if (!results || !results.length) return null;
+    const india = results.filter(x => x.country_code === 'IN');
+    const r = india[0] || results[0];
+    return r;
+  }
+
+  // Try multiple search terms
+  const searchTerms = [
+    cityName,                          // "Ujjain"
+    query.trim(),                      // "Ujjain MP" or "Ujjain Madhya Pradesh"
+    cityName + ', India',              // "Ujjain, India"
+    cityName + ' India',               // "Ujjain India"
+  ];
+
+  // Try Nominatim first for each term — most comprehensive India database
+  for (const term of searchTerms) {
+    try {
+      const url = 'https://nominatim.openstreetmap.org/search?' +
+        'q=' + encodeURIComponent(term) +
+        '&format=json&limit=5&addressdetails=0&accept-language=en&countrycodes=in';
+      const resp = await fetch(url, { mode: 'cors', headers: { 'Accept': 'application/json' } });
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      if (data && data.length > 0) {
+        console.log('Nominatim found:', term, data[0].display_name);
+        return parseNominatim(data);
+      }
+    } catch(e) { console.log('Nominatim error:', e.message); }
+  }
+
+  // Fallback: Open-Meteo
+  for (const term of [cityName, query.trim()]) {
+    try {
+      const url = 'https://geocoding-api.open-meteo.com/v1/search?name=' +
+        encodeURIComponent(term) + '&count=10&language=en&format=json';
+      const resp = await fetch(url, { mode: 'cors' });
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      const result = parseOpenMeteo(data.results);
+      if (result) {
+        console.log('OpenMeteo found:', term, result.name);
+        return result;
+      }
+    } catch(e) { console.log('OpenMeteo error:', e.message); }
+  }
+
+  // Last resort: Photon (Komoot) geocoder
+  try {
+    const url = 'https://photon.komoot.io/api/?q=' +
+      encodeURIComponent(cityName + ' India') + '&limit=5&lang=en';
+    const resp = await fetch(url, { mode: 'cors' });
+    if (resp.ok) {
+      const data = await resp.json();
+      const features = (data.features || []).filter(f =>
+        (f.properties.country || '').toLowerCase().includes('india') ||
+        (f.properties.countrycode || '').toLowerCase() === 'in'
+      );
+      if (features.length > 0) {
+        const f = features[0];
+        console.log('Photon found:', f.properties.name);
+        return {
+          latitude: f.geometry.coordinates[1],
+          longitude: f.geometry.coordinates[0],
+          name: f.properties.name || cityName,
+          admin1: f.properties.state || '',
+          country: 'India'
+        };
+      }
+    }
+  } catch(e) { console.log('Photon error:', e.message); }
+
+  throw new Error(
+    'Could not locate "' + query + '". ' +
+    'Please open browser console (F12) and check for errors. ' +
+    'If you see CORS errors, the tool must be accessed from a website, not a local file.'
+  );
+}
+
+async function fetchPlaces(lat, lon, limit) {
+  const radius = 15000; // 15km radius
+
+  // Build Overpass query based on active filter — no API key needed
+  let osmFilters = '';
+  if (activeFilter === 'all' || activeFilter === 'religion') {
+    osmFilters += 'node["amenity"~"place_of_worship|temple|mosque|church|monastery"](around:' + radius + ',' + lat + ',' + lon + ');';
+    osmFilters += 'way["amenity"~"place_of_worship|temple|mosque|church|monastery"](around:' + radius + ',' + lat + ',' + lon + ');';
+  }
+  if (activeFilter === 'all' || activeFilter === 'historic') {
+    osmFilters += 'node["historic"](around:' + radius + ',' + lat + ',' + lon + ');';
+    osmFilters += 'way["historic"](around:' + radius + ',' + lat + ',' + lon + ');';
+  }
+  if (activeFilter === 'all' || activeFilter === 'natural') {
+    osmFilters += 'node["natural"~"peak|waterfall|beach|lake|hot_spring"](around:' + radius + ',' + lat + ',' + lon + ');';
+    osmFilters += 'node["leisure"~"nature_reserve|park|garden"](around:' + radius + ',' + lat + ',' + lon + ');';
+  }
+  if (activeFilter === 'all' || activeFilter === 'tourism') {
+    osmFilters += 'node["tourism"~"attraction|viewpoint|museum|artwork|zoo|theme_park"](around:' + radius + ',' + lat + ',' + lon + ');';
+    osmFilters += 'way["tourism"~"attraction|viewpoint|museum|artwork|zoo|theme_park"](around:' + radius + ',' + lat + ',' + lon + ');';
+  }
+  if (activeFilter === 'all' || activeFilter === 'leisure') {
+    osmFilters += 'node["leisure"~"park|garden|stadium|sports_centre|golf_course|water_park"](around:' + radius + ',' + lat + ',' + lon + ');';
+    osmFilters += 'way["leisure"~"park|garden|stadium|sports_centre"](around:' + radius + ',' + lat + ',' + lon + ');';
+  }
+
+  const query = '[out:json][timeout:25];(' + osmFilters + ');out body center ' + (limit * 4) + ';';
+  const url = 'https://overpass-api.de/api/interpreter';
+
+  const r = await fetch(url, {
+    method: 'POST',
+    body: query,
+    mode: 'cors'
+  });
+  if (!r.ok) throw new Error('Could not load places. Please try again.');
+  const d = await r.json();
+  if (!d.elements) throw new Error('No data returned. Please try again.');
+
+  // Filter — must have a name
+  const named = d.elements.filter(e => e.tags && e.tags.name);
+
+  // Sort by importance — prefer entries with more tags
+  named.sort((a, b) => Object.keys(b.tags).length - Object.keys(a.tags).length);
+
+  return named.slice(0, limit * 2);
+}
+
+// No longer needed but kept to avoid breaking references
+async function fetchPlaceDetail(xid) { return null; }
+
+function getCatInfo(tags) {
+  const t = tags || {};
+  const amenity = (t.amenity || '').toLowerCase();
+  const historic = (t.historic || '').toLowerCase();
+  const tourism = (t.tourism || '').toLowerCase();
+  const leisure = (t.leisure || '').toLowerCase();
+  const natural = (t.natural || '').toLowerCase();
+  const religion = (t.religion || '').toLowerCase();
+  const name = (t.name || '').toLowerCase();
+
+  if (amenity.includes('place_of_worship') || amenity.includes('temple') || amenity.includes('mosque') || amenity.includes('church') || amenity.includes('monastery') || name.includes('temple') || name.includes('mandir') || name.includes('masjid') || name.includes('gurudwara') || name.includes('church') || name.includes('dargah'))
+    return { label: '🛕 Religious', color: '#fef3c7', text: '#92400e' };
+  if (historic || name.includes('fort') || name.includes('palace') || name.includes('mahal') || name.includes('memorial') || name.includes('ruins') || name.includes('monument'))
+    return { label: '🏛️ Historic', color: '#ede9fe', text: '#5b21b6' };
+  if (natural || name.includes('waterfall') || name.includes('lake') || name.includes('mountain') || name.includes('peak') || name.includes('forest') || name.includes('beach'))
+    return { label: '🌿 Nature', color: '#d1fae5', text: '#065f46' };
+  if (tourism.includes('museum'))
+    return { label: '🏛️ Museum', color: '#ede9fe', text: '#5b21b6' };
+  if (tourism.includes('viewpoint'))
+    return { label: '👁️ Viewpoint', color: '#e0f2fe', text: '#0c4a6e' };
+  if (leisure.includes('park') || leisure.includes('garden') || name.includes('park') || name.includes('garden') || name.includes('bagh'))
+    return { label: '🌸 Park/Garden', color: '#dcfce7', text: '#166534' };
+  if (tourism.includes('attraction') || tourism.includes('artwork') || tourism.includes('zoo') || tourism.includes('theme_park'))
+    return { label: '⭐ Attraction', color: '#fef3c7', text: '#92400e' };
+  return { label: '📍 Point of Interest', color: '#f1f5f9', text: '#475569' };
+}
+
+function mapsLink(name, lat, lon) {
+  return `https://www.google.com/maps/search/${encodeURIComponent(name)}/@${lat},${lon},15z`;
+}
+
+function hotelLink(cityName) {
+  const encoded = encodeURIComponent(cityName);
+  return AFFILIATES.makemytrip + `?city=${encoded}`;
+}
+
+async function searchPlaces() {
+  const query = document.getElementById('city-input').value.trim();
+  if (!query) return;
+  const limit = Math.min(parseInt(document.getElementById('count-input').value) || 5, 20);
+
+  document.getElementById('search-btn').disabled = true;
+  showLoading(true, `Finding top places in ${query}…`);
+
+  try {
+    // Step 1: Geocode
+    const place = await geocodeCity(query);
+    lastCoords = { lat: place.latitude, lon: place.longitude };
+    lastCity = place.name + (place.admin1 ? ', ' + place.admin1 : '');
+    document.getElementById('load-text').textContent = `Loading attractions in ${lastCity}…`;
+
+    // Step 2: Fetch places
+    const places = await fetchPlaces(place.latitude, place.longitude, limit);
+
+    if (!places || places.length === 0) {
+      showLoading(false);
+      showError(`No attractions found for "${query}". Try a larger city or different filter.`);
+      document.getElementById('search-btn').disabled = false;
+      return;
+    }
+
+    // Step 3: Use Overpass data directly — no second API call needed
+    lastResults = places.slice(0, limit);
+    renderPlaces(filterResults(lastResults));
+    showLoading(false);
+    document.getElementById('results-area').style.display = 'block';
+
+  } catch(e) {
+    showLoading(false);
+    showError('⚠️ ' + e.message + (window.location.protocol === 'file:' ? ' (Upload to your website for full functionality)' : ''));
+  }
+
+  document.getElementById('search-btn').disabled = false;
+}
+
+function renderPlaces(places) {
+  const limit = Math.min(parseInt(document.getElementById('count-input').value) || 5, 20);
+
+  document.getElementById('results-title').textContent = `Top ${Math.min(places.length, limit)} Places in ${lastCity}`;
+  document.getElementById('results-sub').textContent = places.length + ' attractions found · Data from OpenStreetMap';
+
+  if (places.length === 0) {
+    document.getElementById('places-grid').innerHTML = `<div class="no-results" style="grid-column:1/-1"><div class="nr-icon">🔍</div><p>No places match this filter. Try "All" or a different category.</p></div>`;
+    return;
+  }
+
+  let html = '';
+  places.slice(0, limit).forEach((p, i) => {
+    const tags = p.tags || {};
+    const cat = getCatInfo(tags);
+
+    // Name
+    const name = tags.name || tags['name:en'] || 'Unnamed Place';
+
+    // Coordinates — Overpass nodes have lat/lon directly, ways have center
+    const lat = p.lat || (p.center && p.center.lat) || lastCoords.lat;
+    const lon = p.lon || (p.center && p.center.lon) || lastCoords.lon;
+
+    // Address from tags
+    const addrParts = [
+      tags['addr:street'] || tags['addr:road'],
+      tags['addr:suburb'] || tags['addr:locality'],
+      tags['addr:city'] || tags['addr:town'] || tags['addr:village'],
+      tags['addr:state']
+    ].filter(Boolean);
+    const addrStr = addrParts.length > 0 ? addrParts.join(', ') : 'Near ' + lastCity;
+
+    // Description — use OSM description or Wikipedia link or generate one
+    const desc = tags.description
+      || tags['description:en']
+      || (tags.wikipedia ? 'Referenced on Wikipedia — click Wiki button for full details.' : '')
+      || (tags.opening_hours ? 'Hours: ' + tags.opening_hours + '. ' : '')
+      || 'A notable ' + cat.label.replace(/[^\w\s]/g, '').trim().toLowerCase() + ' in ' + lastCity + '. Click Maps for directions.';
+
+    // Wikipedia link
+    const wikiRef = tags.wikipedia || tags['wikipedia:en'] || '';
+    const wikiTitle = wikiRef.includes(':') ? wikiRef.split(':').pop() : wikiRef;
+    const wikiUrl = wikiTitle ? 'https://en.wikipedia.org/wiki/' + encodeURIComponent(wikiTitle) : '';
+
+    // Website
+    const website = tags.website || tags.url || '';
+
+    const emojiHtml = '<div class="place-img" style="display:flex;font-size:2.5rem">' + cat.label.split(' ')[0] + '</div>';
+
+    html += '<div class="place-card">' +
+      emojiHtml +
+      '<div class="place-body">' +
+        '<div class="place-rank">#' + (i+1) + '</div>' +
+        '<div class="place-name">' + name + '</div>' +
+        '<span class="place-cat" style="background:' + cat.color + ';color:' + cat.text + '">' + cat.label + '</span>' +
+        '<div class="place-address">📍 ' + addrStr + '</div>' +
+        '<div class="place-desc">' + desc + '</div>' +
+        '<div class="place-actions">' +
+          '<a class="place-btn btn-maps" href="' + mapsLink(name, lat, lon) + '" target="_blank">🗺️ Maps</a>' +
+          (wikiUrl ? '<a class="place-btn btn-wiki" href="' + wikiUrl + '" target="_blank">📖 Wiki</a>' : '') +
+          (website ? '<a class="place-btn btn-wiki" href="' + website + '" target="_blank">🌐 Website</a>' : '') +
+          '<a class="place-btn btn-hotels" href="' + hotelLink(lastCity) + '" target="_blank">🏨 Hotels</a>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  });
+
+  document.getElementById('places-grid').innerHTML = html;
+}
+</script>
+</body>
+</html>
